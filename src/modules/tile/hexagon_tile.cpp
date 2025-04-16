@@ -28,6 +28,7 @@ void HexagonTile::setFillColor(const sf::Color& color)
 void HexagonTile::draw(tgui::BackendRenderTarget& backendTarget, tgui::RenderStates states) const
 {
     // 1) Create the hex shape
+    //    - 6 sides, radius=100 => pointy-topped hex
     sf::CircleShape hex(100.f, 6);
     hex.setFillColor(m_fillColor);
     hex.setOutlineColor(sf::Color::Black);
@@ -35,6 +36,8 @@ void HexagonTile::draw(tgui::BackendRenderTarget& backendTarget, tgui::RenderSta
 
     // 2) Scale it to fill our panel’s size
     sf::Vector2f panelSize = getSize(); // e.g., {150, 150}
+    // Original bounding box of the shape is ~200×173, so scale to fit
+    // By default we consider 160 to match a smaller portion of the bounding box
     hex.setScale({panelSize.x / 160.f, panelSize.y / 160.f});
 
     // 3) Center the shape in the panel

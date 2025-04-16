@@ -18,7 +18,7 @@ tgui::Panel::Ptr createKamonContainer(const std::function<void()>& onBackHome);
 
 // Create a TGUI Panel "tile" (300x150), with a button that calls openCallback when pressed.
 //   This can be placed on your Home screen.
-tgui::Panel::Ptr createKamonTile(const std::function<void()>& openCallback);
+tgui::Panel::Ptr createKamonTile(tgui::Panel::Ptr tile, const std::function<void()>& openCallback);
 
 // You may want a global panel pointer to re-hide or show
 // (optional, but we do it to unify hideAllScreens).

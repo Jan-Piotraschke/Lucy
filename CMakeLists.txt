@@ -13,17 +13,30 @@ project(
   LANGUAGES CXX
 )
 
-# Use C++20 standard
+# ------------------------------------------------------------------------------
+# 2) Build type, C++20, and shared libs
+# ------------------------------------------------------------------------------
+# By default, build in Release mode to minimize size
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+endif()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Build SFML, TGUI, etc. as shared libraries
+set(BUILD_SHARED_LIBS ON)
+
+# Enable Interprocedural Optimization (LTO) if the compiler supports it
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+
 # ------------------------------------------------------------------------------
-# 2) Set the output directory for the binary
+# 3) Set the output directory for the binary
 # ------------------------------------------------------------------------------
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 # ------------------------------------------------------------------------------
-# 3) Fetch SFML and TGUI if not installed via vcpkg
+# 4) Fetch SFML and TGUI if not installed via vcpkg
 # ------------------------------------------------------------------------------
 include(FetchContent)
 
@@ -53,30 +66,25 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(TGUI)
 
 # ------------------------------------------------------------------------------
-# 4) Ensure OpenCV and quirc are found correctly
+# 5) Ensure OpenCV and quirc are found
 # ------------------------------------------------------------------------------
-# Set OpenCV_ROOT explicitly to use the vcpkg version
 set(OpenCV_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/arm64-osx/share/opencv4")
+set(quirc_DIR   "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/arm64-osx/share/quirc")
 
-# Ensure quirc is found correctly
-set(quirc_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/arm64-osx/share/quirc")
-
-# Find OpenCV and quirc (now CMake knows exactly where to look)
 find_package(quirc CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
 
 # ------------------------------------------------------------------------------
-# 5) Add Kiss FFT (lightweight, self-contained FFT library)
+# 6) Add Kiss FFT (lightweight, self-contained FFT library)
 # ------------------------------------------------------------------------------
 add_library(kiss_fft STATIC
     src/modules/kiss_fft/kiss_fft.cpp
 )
 
-# Add include directory for kiss_fft
 target_include_directories(kiss_fft PRIVATE src/modules/kiss_fft)
 
 # ------------------------------------------------------------------------------
-# 6) Create the executable and link necessary libraries
+# 7) Create the executable and link libraries
 # ------------------------------------------------------------------------------
 add_executable(main
     src/main.cpp
@@ -86,22 +94,17 @@ add_executable(main
     src/modules/logs_report/logs_report.cpp
 )
 
-# Ensure we use C++20 or higher
 target_compile_features(main PRIVATE cxx_std_20)
 
-# Link SFML, TGUI, OpenCV, quirc, and Kiss FFT
 target_link_libraries(main
     PRIVATE
         SFML::Graphics
         TGUI::TGUI
         ${OpenCV_LIBS}
         quirc::quirc
-        kiss_fft  # Link Kiss FFT
+        kiss_fft
 )
 
-# ------------------------------------------------------------------------------
-# 7) Ensure output directory is properly set
-# ------------------------------------------------------------------------------
 set_target_properties(main PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )

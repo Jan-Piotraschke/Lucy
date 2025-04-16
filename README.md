@@ -61,6 +61,11 @@ The template starts out very basic, but might receive additional features over t
    ```
 
 ```bash
+strip -x build/bin/main
+```
+-x option on macOS removes all non-global symbols, significantly shrinking size while still allowing a minimal backtrace.
+
+```bash
 find . -type f \( -name "*.cpp" -o -name "*.h" \) ! -name "argparse.hpp" -exec clang-format -i {} \;
 ```
 

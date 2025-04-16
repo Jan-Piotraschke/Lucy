@@ -173,24 +173,19 @@ tgui::Panel::Ptr createKamonContainer(const std::function<void()>& onBackHome)
     return g_kamonPanel;
 }
 
-tgui::Panel::Ptr createKamonTile(const std::function<void()>& openCallback)
+tgui::Panel::Ptr createKamonTile(tgui::Panel::Ptr tile, const std::function<void()>& openCallback)
 {
-    auto kamonTilePanel = tgui::Panel::create({300, 150});
-    kamonTilePanel->getRenderer()->setBackgroundColor(sf::Color(0, 100, 0));
-    kamonTilePanel->getRenderer()->setBorderColor(sf::Color::Black);
-    kamonTilePanel->getRenderer()->setBorders({2, 2, 2, 2});
-
     auto kamonTitle = tgui::Label::create("Kamon");
     kamonTitle->setTextSize(18);
     kamonTitle->getRenderer()->setTextColor(sf::Color::White);
     kamonTitle->setPosition(10, 10);
-    kamonTilePanel->add(kamonTitle);
+    tile->add(kamonTitle);
 
     auto kamonDesc = tgui::Label::create("Show the kamon contour");
     kamonDesc->setTextSize(14);
     kamonDesc->getRenderer()->setTextColor(sf::Color::White);
     kamonDesc->setPosition(10, 40);
-    kamonTilePanel->add(kamonDesc);
+    tile->add(kamonDesc);
 
     auto openBtn = tgui::Button::create("OPEN");
     openBtn->setPosition(10, 80);
@@ -201,9 +196,9 @@ tgui::Panel::Ptr createKamonTile(const std::function<void()>& openCallback)
             if (openCallback)
                 openCallback();
         });
-    kamonTilePanel->add(openBtn);
+    tile->add(openBtn);
 
-    return kamonTilePanel;
+    return tile;
 }
 
 tgui::Panel::Ptr getKamonPanel()

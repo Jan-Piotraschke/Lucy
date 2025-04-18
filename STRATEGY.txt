@@ -58,6 +58,13 @@ So entsteht ein symbiotisches System:
 - AImM hält die digitale Welt des AIoT stabil, adaptiv und effizient
 
 Unsere physik-basierte AIoT ("AI of Things“) Technik hält uns am Leben – und generative AImM ("AI maintained Module") hält die Umgebung der Technik am Leben.
+Die AI soll idealerweise basierend auf SLM (Small Language Model) sein.
+Der Grund dafür liegt, dass diese ressourcenschonender sind und eine hohe Performanz besitzen.
+Dafür wird ein AI Model wie tsuzumi (つずみ) als Grundlage verwendet und im Nachhinein weiter trainiert.
+Ein AI kann auf Python spezialisiert sein, die Andere auf C++ Code.
+Somit können sich die SLM AI Agents wie "aktive Partikel" verhalten und deren hohe Performanz ermöglicht eine schnelle Interaktion und kollektives Verhalten.
+Die zu trainierenden menschlichen Sprachen richten sich danach aus, was der Fokusraum des jeweiligen Business ist. Eine AI muss nicht alle menschlichen Sprachen können. Ein Mensch kann es auch nicht.
+Wenn ein Business z.B. auf die Verbindung zwischen Deutschland und Japan ausgerichtet ist, dann muss es nur japanisch und deutsch verstehen. Dies reduziert den benötigten Trainingsraum.
 
 6. Fazit & Nutzen
 

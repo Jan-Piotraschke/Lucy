@@ -65,6 +65,7 @@ Ein AI kann auf Python spezialisiert sein, die Andere auf C++ Code.
 Somit können sich die SLM AI Agents wie "aktive Partikel" verhalten und deren hohe Performanz ermöglicht eine schnelle Interaktion und kollektives Verhalten.
 Die zu trainierenden menschlichen Sprachen richten sich danach aus, was der Fokusraum des jeweiligen Business ist. Eine AI muss nicht alle menschlichen Sprachen können. Ein Mensch kann es auch nicht.
 Wenn ein Business z.B. auf die Verbindung zwischen Deutschland und Japan ausgerichtet ist, dann muss es nur japanisch und deutsch verstehen. Dies reduziert den benötigten Trainingsraum.
+Somit kann ein PINN mit einen SLM als AIoT geshipt werden. Das PINN versteht die Physik des zu untersuchenden State und das SLM kann mit der Umwelt darüber kommunizieren. Alles lokal on-device.
 
 6. Fazit & Nutzen
 

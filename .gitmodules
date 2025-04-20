@@ -2,3 +2,6 @@
 [submodule "vcpkg"]
 	path = vcpkg
 	url = https://github.com/microsoft/vcpkg.git
+[submodule "doc"]
+	path = doc
+	url = git@github.com:Jan-Piotraschke/nDTissue.git

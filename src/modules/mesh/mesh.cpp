@@ -1,34 +1,43 @@
 #include "mesh.h"
+#include "components/loader/loader.h"
 
 #include <SFML/Graphics.hpp>
 #include <TGUI/TGUI.hpp>
 #include <cmath>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <unordered_set>
 
 namespace fs = std::filesystem;
+using namespace mesh::loader;
 
 // ────────────────────────────────
 //   ▌  Internal, file‑local state
 // ────────────────────────────────
 namespace
 {
+
 std::vector<sf::Vector2f>              verts2;
 std::vector<std::vector<unsigned int>> faces2;
-sf::VertexArray                        mesh2;  // 2‑D triangles
-sf::VertexArray                        edges2; // 2‑D wireframe
+sf::VertexArray                        mesh2;
+sf::VertexArray                        edges2;
 bool                                   mesh2Loaded = false;
 
 std::vector<sf::Vector3f>              verts3;
 std::vector<std::vector<unsigned int>> faces3;
-sf::VertexArray                        mesh3;  // 3‑D triangles (projected)
-sf::VertexArray                        edges3; // 3‑D wireframe (projected)
+sf::VertexArray                        mesh3;
+sf::VertexArray                        edges3;
 bool                                   mesh3Loaded = false;
-float                                  radius3     = 1.f; // bounding radius
+float                                  radius3     = 1.f;
 
-float angle      = 0.f; // Y‑rotation
+std::vector<std::vector<sf::Vector2f>> allFrames;
+std::vector<sf::Vector2f>              dataPoints2;
+bool                                   data2Loaded     = false;
+size_t                                 currentFrameIdx = 0;
+bool                                   playing         = false;
+sf::Clock                              frameClock;
+
+float angle      = 0.f;
 int   lastMouseX = 0;
 bool  dragging   = false;
 
@@ -39,105 +48,44 @@ struct EdgeHash
     {
         unsigned long long a = std::min(e.first, e.second);
         unsigned long long b = std::max(e.first, e.second);
-        return (a + b) * (a + b + 1) / 2 + b; // Cantor pairing
+        return (a + b) * (a + b + 1) / 2 + b;
     }
 };
 using EdgeSet = std::unordered_set<Edge, EdgeHash>;
 
-bool loadOFF2D(
-    const std::string&                      file,
-    std::vector<sf::Vector2f>&              verts,
-    std::vector<std::vector<unsigned int>>& faces)
-{
-    std::ifstream in(file);
-    if (!in)
-        return false;
-
-    std::string header;
-    in >> header;
-    if (header != "OFF")
-        return false;
-
-    size_t nv, nf, ne;
-    in >> nv >> nf >> ne;
-    verts.resize(nv);
-    for (auto& v : verts)
-    {
-        float z;
-        in >> v.x >> v.y >> z;
-    }
-
-    faces.clear();
-    faces.reserve(nf);
-    for (size_t i = 0; i < nf; ++i)
-    {
-        unsigned cnt;
-        in >> cnt;
-        std::vector<unsigned> f(cnt);
-        for (auto& idx : f)
-            in >> idx;
-        faces.push_back(std::move(f));
-    }
-    return true;
-}
-
-bool loadOFF3D(
-    const std::string&                      file,
-    std::vector<sf::Vector3f>&              verts,
-    std::vector<std::vector<unsigned int>>& faces)
-{
-    std::ifstream in(file);
-    if (!in)
-        return false;
-
-    std::string header;
-    in >> header;
-    if (header != "OFF")
-        return false;
-
-    size_t nv, nf, ne;
-    in >> nv >> nf >> ne;
-    verts.resize(nv);
-    for (auto& v : verts)
-        in >> v.x >> v.y >> v.z;
-
-    faces.clear();
-    faces.reserve(nf);
-    for (size_t i = 0; i < nf; ++i)
-    {
-        unsigned cnt;
-        in >> cnt;
-        std::vector<unsigned> f(cnt);
-        for (auto& idx : f)
-            in >> idx;
-        faces.push_back(std::move(f));
-    }
-    return true;
-}
-} // unnamed namespace
+} // namespace
 
 // ────────────────────────────────
 //   ▌  UI‑building helpers
 // ────────────────────────────────
 tgui::Panel::Ptr Mesh::createMeshContainer(std::function<void()> goBackCallback)
 {
-    // Root panel
     auto panel = tgui::Panel::create();
     panel->setSize({"100%", "100%"});
-    panel->getRenderer()->setBackgroundColor(tgui::Color::Transparent); // <‑‑ add this
+    panel->getRenderer()->setBackgroundColor(tgui::Color::Transparent);
 
-    // Back button
     auto backBtn = tgui::Button::create("< Back");
     backBtn->setSize(100, 30);
     backBtn->setPosition(10, 10);
     backBtn->onPress(goBackCallback);
     panel->add(backBtn);
 
-    // ------------------------------------------------------------------
-    // Load meshes once (kept in the anonymous‑namespace statics above)
-    // ------------------------------------------------------------------
-    fs::path base = fs::path(__FILE__).parent_path().parent_path().parent_path().parent_path();
+    auto startBtn = tgui::Button::create("Start");
+    startBtn->setSize(100, 30);
+    startBtn->setPosition(120, 10);
+    startBtn->onPress(
+        []
+        {
+            if (!allFrames.empty())
+            {
+                playing = true;
+                frameClock.restart();
+                std::cout << "Animation started.\n";
+            }
+        });
+    panel->add(startBtn);
 
+    fs::path base      = fs::path(__FILE__).parent_path().parent_path().parent_path().parent_path();
     fs::path kachel    = base / "meshes" / "kachelmuster.off";
     fs::path ellipsoid = base / "meshes" / "ellipsoid.off";
 
@@ -145,20 +93,17 @@ tgui::Panel::Ptr Mesh::createMeshContainer(std::function<void()> goBackCallback)
     {
         mesh2  = sf::VertexArray(sf::PrimitiveType::Triangles);
         edges2 = sf::VertexArray(sf::PrimitiveType::Lines);
-
         if (loadOFF2D(kachel.string(), verts2, faces2))
         {
             EdgeSet used;
             for (const auto& f : faces2)
             {
-                // Filled triangles (fan)
                 for (size_t i = 1; i + 1 < f.size(); ++i)
                 {
                     mesh2.append({verts2[f[0]], sf::Color::White});
                     mesh2.append({verts2[f[i]], sf::Color::White});
                     mesh2.append({verts2[f[i + 1]], sf::Color::White});
                 }
-                // Wireframe (unique edges only)
                 for (size_t i = 0; i < f.size(); ++i)
                 {
                     Edge e{
@@ -172,7 +117,7 @@ tgui::Panel::Ptr Mesh::createMeshContainer(std::function<void()> goBackCallback)
                 }
             }
             mesh2Loaded = true;
-            std::cout << "Loaded 2‑D mesh: " << kachel << '\n';
+            std::cout << "Loaded 2D mesh: " << kachel << '\n';
         }
     }
 
@@ -184,8 +129,14 @@ tgui::Panel::Ptr Mesh::createMeshContainer(std::function<void()> goBackCallback)
             for (const auto& v : verts3)
                 radius3 = std::max(radius3, std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z));
             mesh3Loaded = true;
-            std::cout << "Loaded 3‑D mesh: " << ellipsoid << '\n';
+            std::cout << "Loaded 3D mesh: " << ellipsoid << '\n';
         }
+    }
+
+    fs::path dataFolder = base / "src" / "modules" / "2DTissue" / "data";
+    if (fs::exists(dataFolder))
+    {
+        loadAllFramesFromFolder(dataFolder, allFrames, dataPoints2, data2Loaded, currentFrameIdx);
     }
 
     return panel;
@@ -225,57 +176,81 @@ tgui::Panel::Ptr Mesh::createMeshTile(
 // ────────────────────────────────
 void Mesh::updateAndDraw(sf::RenderWindow& window)
 {
-    // ── overall window geometry ──────────────────────────────────────
+    // Animate CSV frames if playing
+    if (playing && frameClock.getElapsedTime().asSeconds() > 0.1f)
+    {
+        frameClock.restart();
+        if (currentFrameIdx + 1 < allFrames.size())
+        {
+            currentFrameIdx++;
+            dataPoints2 = allFrames[currentFrameIdx];
+        }
+        else
+        {
+            playing = false;
+        }
+    }
+
     constexpr float WIN_W    = 900.f;
     constexpr float WIN_H    = 900.f;
-    constexpr float TOP_FRAC = 0.75f; // 75 % for 2‑D view
+    constexpr float TOP_FRAC = 0.75f;
     constexpr float TOP_H    = WIN_H * TOP_FRAC;
     constexpr float BOTTOM_H = WIN_H - TOP_H;
 
-    // ── basic mouse‑drag rotation (bottom panel only) ────────────────
+    // Mouse drag rotation
     if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)
         && sf::Mouse::getPosition(window).y > TOP_H)
     {
         int dx = sf::Mouse::getPosition(window).x - lastMouseX;
-        angle += dx * 0.005f; // 0.005 rad / px
+        angle += dx * 0.005f;
         dragging = true;
     }
     else
         dragging = false;
     lastMouseX = sf::Mouse::getPosition(window).x;
 
-    // ── draw 2‑D mesh (TOP panel) ────────────────────────────────────
+    // Draw 2D mesh
     if (mesh2Loaded)
     {
-        const auto b     = mesh2.getBounds(); // FloatRect
+        const auto b     = mesh2.getBounds();
         const auto sz    = b.size;
         float      scale = std::min(WIN_W / sz.x, TOP_H / sz.y) * 0.9f;
 
         sf::Transform tr;
-        tr.translate({WIN_W * 0.5f, TOP_H * 0.5f}); // centre of top panel
+        tr.translate({WIN_W * 0.5f, TOP_H * 0.5f});
         tr.scale({scale, -scale});
         tr.translate({-(b.position.x + sz.x * 0.5f), -(b.position.y + sz.y * 0.5f)});
 
         window.draw(mesh2, tr);
         window.draw(edges2, tr);
+
+        // Draw CSV data points
+        if (data2Loaded)
+        {
+            sf::CircleShape pt(3.f);
+            pt.setFillColor(sf::Color::Red);
+            pt.setOrigin({3.f, 3.f});
+            for (const auto& p : dataPoints2)
+            {
+                pt.setPosition(tr.transformPoint(p));
+                window.draw(pt);
+            }
+        }
     }
 
-    // ── draw 3‑D mesh (BOTTOM panel) ─────────────────────────────────
+    // Draw 3D mesh
     if (mesh3Loaded)
     {
         const float        c = std::cos(angle), s = std::sin(angle);
         const float        scale = (std::min(WIN_W, BOTTOM_H) * 0.45f) / radius3;
         const sf::Vector2f centre{WIN_W * 0.5f, TOP_H + BOTTOM_H * 0.5f};
 
-        // project vertices each frame
         std::vector<sf::Vector2f> proj(verts3.size());
         for (size_t i = 0; i < verts3.size(); ++i)
         {
             float x = verts3[i].x * c - verts3[i].z * s;
             float z = verts3[i].x * s + verts3[i].z * c;
-            (void)z;
             float y = verts3[i].y;
-
             proj[i] = {centre.x + x * scale, centre.y - y * scale};
         }
 
@@ -284,17 +259,14 @@ void Mesh::updateAndDraw(sf::RenderWindow& window)
         edges3.clear();
         edges3.setPrimitiveType(sf::PrimitiveType::Lines);
         EdgeSet used;
-
         for (const auto& f : faces3)
         {
-            // Filled tris
             for (size_t i = 1; i + 1 < f.size(); ++i)
             {
                 mesh3.append({proj[f[0]], sf::Color(200, 200, 200)});
                 mesh3.append({proj[f[i]], sf::Color(200, 200, 200)});
                 mesh3.append({proj[f[i + 1]], sf::Color(200, 200, 200)});
             }
-            // Wireframe
             for (size_t i = 0; i < f.size(); ++i)
             {
                 Edge e{

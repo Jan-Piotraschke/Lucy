@@ -480,11 +480,12 @@ void updateAndDraw(sf::RenderWindow& window)
     if (!g_fourierInitialized)
         return;
 
+    // advance time
     g_time += g_speed * 0.02f; // dt
 
     // ========== 1) MAIN EPICYCLE DRAWING ==========
     std::complex<float> sumPrev(0.f, 0.f);
-    sf::Color circleColor = sf::Color(100, 100, 200, 80);
+    sf::Color           circleColor = sf::Color(100, 100, 200, 80);
 
     for (int i = 0; i < g_numComponents; i++)
     {
@@ -492,14 +493,13 @@ void updateAndDraw(sf::RenderWindow& window)
         auto  c      = g_coeffs[i];
         float radius = std::abs(c);
 
-        std::complex<float> sumCurrent(0, 0);
-        {
-            float theta = freq * g_time;
-            float re    = c.real() * std::cos(theta) - c.imag() * std::sin(theta);
-            float im    = c.real() * std::sin(theta) + c.imag() * std::cos(theta);
-            sumCurrent  = sumPrev + std::complex<float>(re, im);
-        }
+        // compute this component's contribution
+        float               theta      = freq * g_time;
+        float               re         = c.real() * std::cos(theta) - c.imag() * std::sin(theta);
+        float               im         = c.real() * std::sin(theta) + c.imag() * std::cos(theta);
+        std::complex<float> sumCurrent = sumPrev + std::complex<float>(re, im);
 
+        // draw the epicycle circle
         sf::CircleShape circle(radius * 200.f);
         circle.setOrigin({radius * 200.f, radius * 200.f});
         circle.setFillColor(sf::Color::Transparent);
@@ -514,14 +514,13 @@ void updateAndDraw(sf::RenderWindow& window)
         sumPrev = sumCurrent;
     }
 
-    // Final tip
+    // draw the traced path
     auto         tip = sumPrev;
     sf::Vector2f tipPos((tip.real() * 200.f) + 450.f, 700.f - ((tip.imag() * 200.f) + 350.f));
     g_path.push_back(tipPos);
     if (g_path.size() > 2000)
         g_path.erase(g_path.begin());
 
-    // Draw path
     sf::VertexArray pathLines(sf::PrimitiveType::LineStrip, g_path.size());
     for (size_t i = 0; i < g_path.size(); i++)
     {
@@ -530,46 +529,53 @@ void updateAndDraw(sf::RenderWindow& window)
     }
     window.draw(pathLines);
 
-    // ========== 2) INDIVIDUAL EPICYCLES GRID ==========
-    const int gridCols = 10;
-    const int gridRows = 10;
-    const int cellSize = 80;
-    const float scale  = 35.f;
+    // ========== 2) CLOCKWORK LAYOUT FOR INDIVIDUAL EPICYCLES ==========
+    const int          clockCount = g_numComponents;
+    const float        ringRadius = 250.f;         // distance from center
+    const sf::Vector2f screenCenter(450.f, 350.f); // same center as main
 
-    for (int i = 0; i < g_numComponents; i++)
+    for (int i = 0; i < clockCount; ++i)
     {
-        int row = i / gridCols;
-        int col = i % gridCols;
+        // 2.1 compute each clock’s center on a ring
+        float        arrAng = 2 * M_PI * float(i) / float(clockCount);
+        sf::Vector2f center = {
+            screenCenter.x + std::cos(arrAng) * ringRadius,
+            screenCenter.y + std::sin(arrAng) * ringRadius};
 
-        float xOffset = float(col * cellSize) + 20.f;
-        float yOffset = float(W_HEIGHT + row * cellSize - 300.f); // below main drawing
+        // 2.2 radius of this epicycle “clock”
+        float radius = std::abs(g_coeffs[i]) * 35.f;
 
-        float radius = std::abs(g_coeffs[i]) * scale;
-        float angle  = g_freqs[i] * g_time;
+        // ---- draw clock face ----
+        sf::CircleShape face(radius);
+        face.setOrigin(sf::Vector2f(radius, radius));
+        face.setPosition(center);
+        face.setFillColor(sf::Color::Transparent);
+        face.setOutlineColor(sf::Color(50, 50, 50));
+        face.setOutlineThickness(1.f);
+        window.draw(face);
 
-        // Center of this cell
-        sf::Vector2f center(xOffset + cellSize / 2.f, yOffset + cellSize / 2.f);
-
-        // Circle
-        sf::CircleShape c(radius);
-        c.setOrigin(sf::Vector2f(radius, radius));
-        c.setPosition(center);
-        c.setFillColor(sf::Color::Transparent);
-        c.setOutlineColor(sf::Color(50, 50, 50));
-        c.setOutlineThickness(1.f);
-        window.draw(c);
-
-        // Rotating vector (line from center to tip)
-        sf::Vector2f tip(
-            center.x + std::cos(angle) * radius,
-            center.y + std::sin(angle) * radius);
-
-        sf::Vertex line[] = {
-            sf::Vertex(center, sf::Color::Red),
-            sf::Vertex(tip, sf::Color::Red)};
-        window.draw(line, 2, sf::PrimitiveType::Lines);
+        // ---- draw tick marks ----
+        const int numTicks = 12;
+        for (int t = 0; t < numTicks; ++t)
+        {
+            float        tickAng = 2 * M_PI * t / numTicks;
+            sf::Vector2f outer   = {
+                center.x + std::cos(tickAng) * radius, center.y + std::sin(tickAng) * radius};
+            sf::Vector2f inner = {
+                center.x + std::cos(tickAng) * (radius * 0.85f),
+                center.y + std::sin(tickAng) * (radius * 0.85f)};
+            sf::Vertex tickLine[] = {
+                {outer, sf::Color(80, 80, 80)}, {inner, sf::Color(80, 80, 80)}};
+            window.draw(tickLine, 2, sf::PrimitiveType::Lines);
         }
-}
 
+        // ---- draw the rotating hand ----
+        float        theta = g_freqs[i] * g_time;
+        sf::Vector2f tip   = {
+            center.x + std::cos(theta) * radius, center.y + std::sin(theta) * radius};
+        sf::Vertex hand[] = {{center, sf::Color::Red}, {tip, sf::Color::Red}};
+        window.draw(hand, 2, sf::PrimitiveType::Lines);
+    }
+}
 
 } // namespace KamonFourier

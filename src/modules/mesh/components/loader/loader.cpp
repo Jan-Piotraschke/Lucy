@@ -2,6 +2,7 @@
 #include "loader.h"
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -102,6 +103,25 @@ bool loadCSV2D(const std::string& file, std::vector<sf::Vector2f>& pts)
     return true;
 }
 
+// Helper function to rotate and translate a 2D point
+sf::Vector2f customRotate(const sf::Vector2f& pt, float angleDegrees, float shiftX, float shiftY)
+{
+    const float angleRadians = angleDegrees * static_cast<float>(M_PI) / 180.f;
+    const float cosTheta     = std::cos(angleRadians);
+    const float sinTheta     = std::sin(angleRadians);
+    const float threshold    = 1e-6f;
+
+    float x_prime = pt.x * cosTheta - pt.y * sinTheta;
+    float y_prime = pt.x * sinTheta + pt.y * cosTheta;
+
+    if (std::abs(x_prime) < threshold)
+        x_prime = 0.f;
+    if (std::abs(y_prime) < threshold)
+        y_prime = 0.f;
+
+    return {x_prime + shiftX, y_prime + shiftY};
+}
+
 void loadAllFramesFromFolder(
     const std::filesystem::path&            folder,
     std::vector<std::vector<sf::Vector2f>>& allFrames,
@@ -125,14 +145,32 @@ void loadAllFramesFromFolder(
 
     std::sort(files.begin(), files.end());
     allFrames.clear();
+
     for (const auto& [_, path] : files)
     {
         std::vector<sf::Vector2f> frame;
         if (loadCSV2D(path.string(), frame))
-            allFrames.push_back(std::move(frame));
+        {
+            std::vector<sf::Vector2f> augmented;
+
+            // Original
+            augmented.insert(augmented.end(), frame.begin(), frame.end());
+
+            // Rotated & translated variants
+            for (const auto& pt : frame)
+                augmented.push_back(customRotate(pt, 90.f, 0.f, 0.f));
+            for (const auto& pt : frame)
+                augmented.push_back(customRotate(pt, 90.f, 2.f, 0.f));
+            for (const auto& pt : frame)
+                augmented.push_back(customRotate(pt, 270.f, 0.f, 2.f));
+            for (const auto& pt : frame)
+                augmented.push_back(customRotate(pt, 270.f, 0.f, 0.f));
+
+            allFrames.push_back(std::move(augmented));
+        }
     }
 
-    std::cout << "Loaded " << allFrames.size() << " frames.\n";
+    std::cout << "Loaded " << allFrames.size() << " augmented frames.\n";
     if (!allFrames.empty())
     {
         currentPoints  = allFrames[0];

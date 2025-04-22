@@ -5,3 +5,6 @@
 [submodule "doc"]
 	path = doc
 	url = git@github.com:Jan-Piotraschke/nDTissue.git
+[submodule "src/modules/2DTissue"]
+	path = src/modules/2DTissue
+	url = git@github.com:Jan-Piotraschke/2DTissue.git

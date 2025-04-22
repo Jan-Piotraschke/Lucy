@@ -1,4 +1,5 @@
 #include "kamon_fourier.h"
+#include "components/contourExtractor/contourExtractor.h"
 
 #include <TGUI/TGUI.hpp>
 #include <cmath>
@@ -35,219 +36,6 @@ static std::vector<sf::Vector2f> g_path;
 // Window size
 static const int W_WIDTH  = 900;
 static const int W_HEIGHT = 700;
-
-// -----------------------------------------------------------------------------
-// 1) Helper: load & extract largest contour from PNG (same as before)
-// -----------------------------------------------------------------------------
-std::vector<sf::Vector2f> extractLargestContour(const std::string& imagePath)
-{
-    cv::Mat img = cv::imread(imagePath, cv::IMREAD_GRAYSCALE);
-    if (img.empty())
-    {
-        std::cerr << "[KamonFourier] Failed to load image: " << imagePath << std::endl;
-        return {};
-    }
-
-    cv::Mat thresh;
-    cv::threshold(img, thresh, 127, 255, cv::THRESH_BINARY_INV);
-
-    std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-
-    if (contours.empty())
-    {
-        std::cerr << "[KamonFourier] No contours found.\n";
-        return {};
-    }
-
-    auto largestIt = std::max_element(
-        contours.begin(),
-        contours.end(),
-        [](auto& c1, auto& c2) { return cv::contourArea(c1) < cv::contourArea(c2); });
-
-    std::vector<sf::Vector2f> pts;
-    pts.reserve(largestIt->size());
-    for (auto& pt : *largestIt)
-    {
-        // flip Y
-        pts.emplace_back(float(pt.x), float(-pt.y));
-    }
-    return pts;
-}
-
-// -----------------------------------------------------------------------------
-// 2) Helper: minimal SVG path parser to extract a single path from "kamon.svg".
-//    This is extremely naive. It only parses M, L, and C commands with absolute
-//    coordinates. If your SVG has arcs, transforms, etc., this won't handle it!
-//
-//    Returns vector of (x,y) in same coordinate space (with Y upward if we later
-//    flip).
-// -----------------------------------------------------------------------------
-std::vector<sf::Vector2f> extractContourFromSVG(const std::string& svgPath)
-{
-    // 2.1) Read entire file into a string
-    std::ifstream in(svgPath);
-    if (!in.is_open())
-    {
-        std::cerr << "[KamonFourier] Failed to open SVG file: " << svgPath << "\n";
-        return {};
-    }
-    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    in.close();
-
-    // 2.2) Find the first <path ... d="..."> inside the file
-    auto pathPos = content.find("<path");
-    if (pathPos == std::string::npos)
-    {
-        std::cerr << "[KamonFourier] No <path> found in SVG.\n";
-        return {};
-    }
-    // find d=
-    auto dPos = content.find(" d=", pathPos);
-    if (dPos == std::string::npos)
-    {
-        // some have d= without space, try that
-        dPos = content.find("d=", pathPos);
-        if (dPos == std::string::npos)
-        {
-            std::cerr << "[KamonFourier] No d= attribute found in <path>.\n";
-            return {};
-        }
-    }
-
-    // find the first quote after d=
-    auto firstQuote = content.find('"', dPos);
-    if (firstQuote == std::string::npos)
-    {
-        std::cerr << "[KamonFourier] No opening quote for path d=.\n";
-        return {};
-    }
-    // find closing quote
-    auto secondQuote = content.find('"', firstQuote + 1);
-    if (secondQuote == std::string::npos)
-    {
-        std::cerr << "[KamonFourier] No closing quote for path d=.\n";
-        return {};
-    }
-    // extract the substring of path data
-    std::string pathData = content.substr(firstQuote + 1, secondQuote - (firstQuote + 1));
-
-    // 2.3) Parse the path commands. We'll handle M, L, C (absolute only).
-    //      We'll store the resulting points in an array (with some sampling).
-    std::vector<sf::Vector2f> points;
-
-    auto skipSpaces = [&](std::istringstream& iss)
-    {
-        while (iss && std::isspace(iss.peek()))
-        {
-            iss.ignore(1);
-        }
-    };
-
-    // We'll maintain a "current" position
-    sf::Vector2f currentPos(0.f, 0.f);
-
-    std::istringstream iss(pathData);
-    char               cmd;
-    while (iss >> cmd)
-    {
-        if (cmd == 'M') // MoveTo absolute
-        {
-            float x, y;
-            iss >> x;
-            skipSpaces(iss);
-            iss >> y;
-            skipSpaces(iss);
-
-            currentPos.x = x;
-            currentPos.y = y;
-            points.push_back(currentPos);
-        }
-        else if (cmd == 'L') // LineTo absolute
-        {
-            float x, y;
-            while (true)
-            {
-                if (!(iss >> x))
-                    break;
-                if (!(iss >> y))
-                    break;
-                currentPos.x = x;
-                currentPos.y = y;
-                points.push_back(currentPos);
-
-                skipSpaces(iss);
-                if (iss.peek() == 'M' || iss.peek() == 'C' || !iss.good())
-                    break;
-            }
-        }
-        else if (cmd == 'C') // Cubic Bézier absolute
-        {
-            // We read sets of 6 floats: (x1,y1, x2,y2, x3,y3) until next command
-            const int NUM_SAMPLES_PER_BEZIER = 30;
-            while (true)
-            {
-                float x1, y1, x2, y2, x3, y3;
-                if (!(iss >> x1))
-                    break;
-                if (!(iss >> y1))
-                    break;
-                if (!(iss >> x2))
-                    break;
-                if (!(iss >> y2))
-                    break;
-                if (!(iss >> x3))
-                    break;
-                if (!(iss >> y3))
-                    break;
-
-                // We have a cubic from currentPos to (x3, y3),
-                // control points (x1,y1), (x2,y2).
-                // We'll subdivide the curve into many line segments.
-                // param t=0..1
-                for (int i = 1; i <= NUM_SAMPLES_PER_BEZIER; i++)
-                {
-                    float t  = float(i) / float(NUM_SAMPLES_PER_BEZIER);
-                    float mt = 1.f - t;
-                    // standard cubic interpolation:
-                    //   B(t) = (mt^3)*P0 + 3*(mt^2)*t*C1 + 3*mt*(t^2)*C2 + (t^3)*P3
-                    float bx = mt * mt * mt * currentPos.x + 3.f * mt * mt * t * x1
-                               + 3.f * mt * (t * t) * x2 + t * t * t * x3;
-                    float by = mt * mt * mt * currentPos.y + 3.f * mt * mt * t * y1
-                               + 3.f * mt * (t * t) * y2 + t * t * t * y3;
-                    points.emplace_back(bx, by);
-                }
-
-                // The new currentPos is the end of this cubic
-                currentPos.x = x3;
-                currentPos.y = y3;
-
-                skipSpaces(iss);
-                // if the next char is something else, break
-                if (iss.peek() == 'M' || iss.peek() == 'L' || iss.peek() == 'C' || !iss.good())
-                {
-                    break;
-                }
-            }
-        }
-        else
-        {
-            // If we see a command we don't handle (like 'm','l','c' rel coords, 'A', etc.),
-            // we skip or break. Real code would handle them or parse transformations, etc.
-            std::cerr << "[KamonFourier] Unhandled SVG path command: " << cmd << "\n";
-            break;
-        }
-    }
-
-    // If we found zero points, we consider it an error
-    if (points.size() < 2)
-    {
-        std::cerr << "[KamonFourier] No valid points in SVG path or parser too naive.\n";
-        return {};
-    }
-
-    return points;
-}
 
 // -----------------------------------------------------------------------------
 // 3) Normalize to [-1,1] range (same as before)
@@ -359,13 +147,15 @@ void initFourierData()
     std::string svgPath = "assets/kamon.svg";
     std::string pngPath = "assets/kamon_fourier.png";
 
+    using namespace KamonFourier::ContourExtractor;
+
     g_contourPoints = extractContourFromSVG(svgPath);
     if (g_contourPoints.empty())
     {
-        // fallback
         std::cerr << "[KamonFourier] Falling back to PNG contour...\n";
         g_contourPoints = extractLargestContour(pngPath);
     }
+
 
     if (g_contourPoints.empty())
     {

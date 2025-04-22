@@ -82,6 +82,7 @@ add_executable(main
     src/modules/tile/hexagon_tile.cpp
     src/modules/mesh/mesh.cpp
     src/modules/mesh/components/loader/loader.cpp
+    src/modules/kamon_fourier/components/contourExtractor/contourExtractor.cpp
     src/modules/kamon_fourier/kamon_fourier.cpp
     src/modules/logs_report/logs_report.cpp
 )

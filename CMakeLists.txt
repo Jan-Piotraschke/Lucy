@@ -75,15 +75,6 @@ find_package(quirc CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
 
 # ------------------------------------------------------------------------------
-# 6) Add Kiss FFT (lightweight, self-contained FFT library)
-# ------------------------------------------------------------------------------
-add_library(kiss_fft STATIC
-    src/modules/kiss_fft/kiss_fft.cpp
-)
-
-target_include_directories(kiss_fft PRIVATE src/modules/kiss_fft)
-
-# ------------------------------------------------------------------------------
 # 7) Create the executable and link libraries
 # ------------------------------------------------------------------------------
 add_executable(main
@@ -102,7 +93,6 @@ target_link_libraries(main
         TGUI::TGUI
         ${OpenCV_LIBS}
         quirc::quirc
-        kiss_fft
 )
 
 set_target_properties(main PROPERTIES

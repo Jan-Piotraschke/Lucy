@@ -9,16 +9,16 @@
 #include <optional>
 #include <vector>
 
-#include "modules/kamon/kamon.h"
 #include "modules/kamon_fourier/kamon_fourier.h"
 #include "modules/logs_report/logs_report.h"
+#include "modules/mesh/mesh.h"
 #include "modules/tile/hexagon_tile.h"
 
 enum class Screen
 {
     Home,
     LogAnalysis,
-    Kamon,
+    Mesh,
     KamonFourier
 };
 
@@ -55,7 +55,7 @@ static const sf::Color PaleBlush     = sf::Color(238, 169, 169); // 鴇
 
 // Fixed window resolution
 static const unsigned WINDOW_WIDTH  = 900u;
-static const unsigned WINDOW_HEIGHT = 900u;
+static const unsigned WINDOW_HEIGHT = 1000u;
 
 int main()
 {
@@ -93,8 +93,8 @@ int main()
     homeContainer->setVisible(true);
 
     tgui::Panel::Ptr logAnalysisContainer;
-    tgui::Panel::Ptr kamonContainer;
     tgui::Panel::Ptr kamonFourierContainer;
+    tgui::Panel::Ptr meshContainer;
 
     logAnalysisContainer = Logs::createLogAnalysisContainer(
         [&]()
@@ -103,7 +103,7 @@ int main()
             hideAllScreens(
                 {homeContainer,
                  logAnalysisContainer,
-                 Kamon::getKamonPanel(),
+                 meshContainer,
                  KamonFourier::getFourierPanel()});
             homeContainer->setVisible(true);
         });
@@ -111,26 +111,26 @@ int main()
     logAnalysisContainer->setSize({(float)WINDOW_WIDTH, (float)WINDOW_HEIGHT});
     logAnalysisContainer->setVisible(false);
 
-    kamonContainer = Kamon::createKamonContainer(
+    meshContainer = Mesh::createMeshContainer(
         [&]()
         {
             currentScreen = Screen::Home;
             hideAllScreens(
                 {homeContainer,
                  logAnalysisContainer,
-                 kamonContainer,
+                 meshContainer,
                  KamonFourier::getFourierPanel()});
             homeContainer->setVisible(true);
         });
-    kamonContainer->setSize({(float)WINDOW_WIDTH, (float)WINDOW_HEIGHT});
-    kamonContainer->setVisible(false);
+    meshContainer->setSize({(float)WINDOW_WIDTH, (float)WINDOW_HEIGHT});
+    meshContainer->setVisible(false);
 
     kamonFourierContainer = KamonFourier::createKamonFourierContainer(
         [&]()
         {
             currentScreen = Screen::Home;
             hideAllScreens(
-                {homeContainer, logAnalysisContainer, kamonContainer, kamonFourierContainer});
+                {homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
             homeContainer->setVisible(true);
         });
     kamonFourierContainer->setSize({(float)WINDOW_WIDTH, (float)WINDOW_HEIGHT});
@@ -139,7 +139,7 @@ int main()
     // Add them to the GUI
     gui.add(homeContainer);
     gui.add(logAnalysisContainer);
-    gui.add(kamonContainer);
+    gui.add(meshContainer);
     gui.add(kamonFourierContainer);
 
     // Child windows:
@@ -177,7 +177,7 @@ int main()
         {
             currentScreen = Screen::Home;
             hideAllScreens(
-                {homeContainer, logAnalysisContainer, kamonContainer, kamonFourierContainer});
+                {homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
             homeContainer->setVisible(true);
         });
 
@@ -314,18 +314,18 @@ int main()
     homeContent->add(logsTile);
 
     // "Kamon" tile, centered horizontally at y=530
-    auto logsKamonHexTile = HexagonTile::create({150.f, 150.f}, RetroPalette::Indigo);
-    auto kamonTile        = Kamon::createKamonTile(
-        logsKamonHexTile,
+    auto MeshHexTile = HexagonTile::create({150.f, 150.f}, RetroPalette::Indigo);
+    auto meshTile    = Mesh::createMeshTile(
+        MeshHexTile,
         [&]()
         {
-            currentScreen = Screen::Kamon;
+            currentScreen = Screen::Mesh;
             hideAllScreens(
-                {homeContainer, logAnalysisContainer, kamonContainer, kamonFourierContainer});
-            kamonContainer->setVisible(true);
+                {homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
+            meshContainer->setVisible(true);
         });
-    kamonTile->setPosition({"(&.width - width)/2", 530});
-    homeContent->add(kamonTile);
+    meshTile->setPosition({"(&.width - width)/2", 530});
+    homeContent->add(meshTile);
 
     // "Kamon Fourier" tile, centered horizontally at y=710
     auto fourierTile = KamonFourier::createFourierTile(
@@ -333,7 +333,7 @@ int main()
         {
             currentScreen = Screen::KamonFourier;
             hideAllScreens(
-                {homeContainer, logAnalysisContainer, kamonContainer, kamonFourierContainer});
+                {homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
             kamonFourierContainer->setVisible(true);
         });
     fourierTile->setPosition({"(&.width - width)/2", 710});
@@ -371,7 +371,7 @@ int main()
                 loading       = false;
                 currentScreen = Screen::LogAnalysis;
                 hideAllScreens(
-                    {homeContainer, logAnalysisContainer, kamonContainer, kamonFourierContainer});
+                    {homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
                 logAnalysisContainer->setVisible(true);
                 std::cout << "[LOGS] Done loading, switch to LogAnalysis screen.\n";
             }
@@ -381,17 +381,17 @@ int main()
         goodbyeWindow->setVisible(showGoodbye);
 
         window.clear(RetroPalette::LightGray);
+        window.setView(window.getDefaultView());
+        gui.draw(); // 1 – GUI first
 
         // If on KamonFourier screen, update/draw epicycles
         if (currentScreen == Screen::KamonFourier)
         {
             KamonFourier::updateAndDraw(window);
         }
-        else if (currentScreen == Screen::Kamon)
+        else if (currentScreen == Screen::Mesh)
         {
-            // If on normal Kamon screen, draw the red contour
-            sf::VertexArray kamonBorder = Kamon::createKamonContourShape();
-            window.draw(kamonBorder);
+            Mesh::updateAndDraw(window);
         }
 
         gui.draw();

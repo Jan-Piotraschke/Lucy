@@ -89,7 +89,7 @@ target_include_directories(kiss_fft PRIVATE src/modules/kiss_fft)
 add_executable(main
     src/main.cpp
     src/modules/tile/hexagon_tile.cpp
-    src/modules/kamon/kamon.cpp
+    src/modules/mesh/mesh.cpp
     src/modules/kamon_fourier/kamon_fourier.cpp
     src/modules/logs_report/logs_report.cpp
 )

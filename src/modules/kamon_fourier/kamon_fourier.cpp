@@ -443,13 +443,13 @@ tgui::Panel::Ptr createFourierTile(const std::function<void()>& openCallback)
     panel->getRenderer()->setBorderColor(sf::Color::Black);
     panel->getRenderer()->setBorders({2, 2, 2, 2});
 
-    auto lbl = tgui::Label::create("Kamon Fourier");
+    auto lbl = tgui::Label::create("das Uhrwerk von Kamon");
     lbl->setTextSize(18);
     lbl->getRenderer()->setTextColor(sf::Color::White);
     lbl->setPosition(10, 10);
     panel->add(lbl);
 
-    auto desc = tgui::Label::create("Show epicycle animation");
+    auto desc = tgui::Label::create("Show animation");
     desc->setTextSize(14);
     desc->getRenderer()->setTextColor(sf::Color::White);
     desc->setPosition(10, 40);

@@ -208,14 +208,8 @@ tgui::Panel::Ptr createKamonFourierContainer(const std::function<void()>& onBack
     content->getRenderer()->setBackgroundColor(tgui::Color::Transparent);
     g_fourierPanel->add(content);
 
-    auto title = tgui::Label::create("Kamon Fourier Epicycle Screen");
-    title->setTextSize(24);
-    title->getRenderer()->setTextColor(sf::Color(0, 51, 102));
-    title->setPosition({"(&.width - width)/2", 150});
-    content->add(title);
-
     auto backBtn = tgui::Button::create("Back to Home");
-    backBtn->setPosition({"(&.width - width)/2", 220});
+    backBtn->setPosition({0.f, 0.f});
     backBtn->onPress(
         [onBackHome]()
         {

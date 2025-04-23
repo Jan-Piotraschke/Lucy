@@ -2,6 +2,7 @@
 
 #include <SFML/Graphics.hpp>
 #include <complex>
+#include <optional>
 #include <vector>
 
 namespace KamonFourier
@@ -45,6 +46,12 @@ class Visualizer
         sf::RenderWindow&                       window,
         const std::vector<std::complex<float>>& coeffs,
         const std::vector<int>&                 freqs);
+
+    bool loadBackground(const std::string& filename);
+
+    sf::Texture               m_bgTexture;
+    std::optional<sf::Sprite> m_bgSprite;
+    bool                      m_bgLoaded{false};
 
     float                     m_speed{2.f};
     float                     m_time{0.f};

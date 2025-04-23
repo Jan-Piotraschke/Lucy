@@ -6,13 +6,32 @@ namespace KamonFourier
 {
 namespace
 {
-constexpr float TWO_PI = 6.283185307179586476925f;
-}
+constexpr float TWO_PI     = 6.283185307179586476925f;
+constexpr float DRAW_SCALE = 0.45f; // 1.0 = 100 %, 0.6 = 60 %
+} // namespace
 
 Visualizer::Visualizer(int numComponents, float speed)
     : m_speed(speed), m_time(0.f), m_numComponents(numComponents)
 {
     m_path.reserve(2000);
+    m_bgLoaded = loadBackground("assets/niwa.png");
+}
+
+bool Visualizer::loadBackground(const std::string& filename)
+{
+    if (!m_bgTexture.loadFromFile(filename))
+        return false;
+
+    m_bgSprite.emplace(m_bgTexture);
+
+    // Scale to cover the window once we know its size (≈ first frame).
+    // A single scalar keeps the aspect ratio.
+    const sf::Vector2u texSize = m_bgTexture.getSize();
+    if (texSize.x == 0 || texSize.y == 0)
+        return false;
+
+    // Will be re-evaluated in updateAndDraw() if the window is resized.
+    return true;
 }
 
 void Visualizer::reset()
@@ -32,6 +51,27 @@ void Visualizer::updateAndDraw(
 
     // 1) Advance time ---------------------------------------------------------
     m_time += m_speed * 0.02f; // dt (same constant as before)
+
+    // ---- background ------------------------------------------------------
+    if (m_bgLoaded)
+    {
+        auto& sprite = *m_bgSprite;
+
+        // 1) automatic cover-window scaling
+        const sf::Vector2u win = window.getSize();
+        const sf::Vector2u tex = m_bgTexture.getSize();
+        float              cover =
+            std::max(static_cast<float>(win.x) / tex.x, static_cast<float>(win.y) / tex.y);
+
+        // 2) manual tweaks
+        constexpr float EXTRA = 0.85f; // size tweak
+
+        sprite.setScale({cover * EXTRA, cover * EXTRA});
+        sprite.setOrigin(sf::Vector2f(tex.x * 0.5f, tex.y * 0.5f));
+        sprite.setPosition(sf::Vector2f(win.x * 0.5f, win.y * 0.5f + 18.f));
+
+        window.draw(sprite);
+    }
 
     // 2) MAIN EPICYCLE DRAWING ------------------------------------------------
     std::complex<float> sumPrev(0.f, 0.f);
@@ -53,8 +93,11 @@ void Visualizer::updateAndDraw(
     }
 
     // ---------- traced path ----------
+    const sf::Vector2f screenCenter(450.f, 350.f);
+
     const sf::Vector2f tipPos(
-        (sumPrev.real() * 200.f) + 450.f, 700.f - ((sumPrev.imag() * 200.f) + 350.f));
+        screenCenter.x + sumPrev.real() * 200.f * DRAW_SCALE,
+        screenCenter.y - sumPrev.imag() * 200.f * DRAW_SCALE);
 
     m_path.push_back(tipPos);
     if (m_path.size() > 2000)
@@ -85,7 +128,7 @@ void Visualizer::drawClockwork(
     const std::vector<int>&                 freqs)
 {
     const int          clockCount = m_numComponents;
-    const float        ringRadius = 250.f;
+    const float        ringRadius = 300.f * DRAW_SCALE;
     const sf::Vector2f screenCenter(450.f, 350.f);
 
     for (int i = 0; i < clockCount; ++i)
@@ -97,13 +140,14 @@ void Visualizer::drawClockwork(
             screenCenter.y + std::sin(arrAng) * ringRadius);
 
         // ---- clock face ----------------------------------------------------
-        const float     radius = std::abs(coeffs[i]) * 35.f;
+        const float     radius = std::abs(coeffs[i]) * 50.f * DRAW_SCALE;
         sf::CircleShape face(radius);
         face.setOrigin(sf::Vector2f(radius, radius));
         face.setPosition(center);
-        face.setFillColor(sf::Color::Transparent);
+        sf::Color color(157, 124, 79);
+        face.setFillColor(color);
         face.setOutlineColor(sf::Color(50, 50, 50));
-        face.setOutlineThickness(1.f);
+        face.setOutlineThickness(1.5f);
         window.draw(face);
 
         // ---- tick marks ----------------------------------------------------

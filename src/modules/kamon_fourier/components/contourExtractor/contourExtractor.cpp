@@ -1,9 +1,9 @@
 #include "contourExtractor.h"
 
 #include <SFML/System/Vector2.hpp>
-#include <opencv2/opencv.hpp>
 #include <fstream>
 #include <iostream>
+#include <opencv2/opencv.hpp>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -33,7 +33,8 @@ std::vector<sf::Vector2f> extractLargestContour(const std::string& imagePath)
     }
 
     auto largestIt = std::max_element(
-        contours.begin(), contours.end(),
+        contours.begin(),
+        contours.end(),
         [](const auto& a, const auto& b) { return cv::contourArea(a) < cv::contourArea(b); });
 
     std::vector<sf::Vector2f> points;
@@ -73,7 +74,7 @@ std::vector<sf::Vector2f> extractContourFromSVG(const std::string& svgPath)
         return {};
     }
 
-    auto firstQuote = content.find('"', dPos);
+    auto firstQuote  = content.find('"', dPos);
     auto secondQuote = content.find('"', firstQuote + 1);
     if (firstQuote == std::string::npos || secondQuote == std::string::npos)
     {
@@ -84,21 +85,25 @@ std::vector<sf::Vector2f> extractContourFromSVG(const std::string& svgPath)
     std::string pathData = content.substr(firstQuote + 1, secondQuote - (firstQuote + 1));
 
     std::vector<sf::Vector2f> points;
-    auto skipSpaces = [](std::istringstream& iss)
+    auto                      skipSpaces = [](std::istringstream& iss)
     {
-        while (iss && std::isspace(iss.peek())) iss.ignore();
+        while (iss && std::isspace(iss.peek()))
+            iss.ignore();
     };
 
-    sf::Vector2f currentPos(0.f, 0.f);
+    sf::Vector2f       currentPos(0.f, 0.f);
     std::istringstream iss(pathData);
-    char cmd;
+    char               cmd;
 
     while (iss >> cmd)
     {
         if (cmd == 'M')
         {
             float x, y;
-            iss >> x; skipSpaces(iss); iss >> y; skipSpaces(iss);
+            iss >> x;
+            skipSpaces(iss);
+            iss >> y;
+            skipSpaces(iss);
             currentPos = {x, y};
             points.push_back(currentPos);
         }
@@ -108,7 +113,8 @@ std::vector<sf::Vector2f> extractContourFromSVG(const std::string& svgPath)
             while (iss >> x)
             {
                 skipSpaces(iss);
-                if (!(iss >> y)) break;
+                if (!(iss >> y))
+                    break;
                 currentPos = {x, y};
                 points.push_back(currentPos);
                 skipSpaces(iss);
@@ -119,17 +125,17 @@ std::vector<sf::Vector2f> extractContourFromSVG(const std::string& svgPath)
         else if (cmd == 'C')
         {
             const int NUM_SAMPLES = 30;
-            float x1, y1, x2, y2, x3, y3;
+            float     x1, y1, x2, y2, x3, y3;
             while (iss >> x1 >> y1 >> x2 >> y2 >> x3 >> y3)
             {
                 for (int i = 1; i <= NUM_SAMPLES; i++)
                 {
                     float t  = float(i) / NUM_SAMPLES;
                     float mt = 1.f - t;
-                    float bx = mt * mt * mt * currentPos.x + 3 * mt * mt * t * x1 +
-                               3 * mt * t * t * x2 + t * t * t * x3;
-                    float by = mt * mt * mt * currentPos.y + 3 * mt * mt * t * y1 +
-                               3 * mt * t * t * y2 + t * t * t * y3;
+                    float bx = mt * mt * mt * currentPos.x + 3 * mt * mt * t * x1
+                               + 3 * mt * t * t * x2 + t * t * t * x3;
+                    float by = mt * mt * mt * currentPos.y + 3 * mt * mt * t * y1
+                               + 3 * mt * t * t * y2 + t * t * t * y3;
                     points.emplace_back(bx, by);
                 }
                 currentPos = {x3, y3};

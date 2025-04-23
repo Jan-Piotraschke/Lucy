@@ -35,38 +35,27 @@ void Visualizer::updateAndDraw(
 
     // 2) MAIN EPICYCLE DRAWING ------------------------------------------------
     std::complex<float> sumPrev(0.f, 0.f);
-    const sf::Color     circleColor(100, 100, 200, 80);
 
     for (int i = 0; i < m_numComponents; ++i)
     {
-        const float               freq   = static_cast<float>(freqs[i]);
-        const auto&               c      = coeffs[i];
-        const float               radius = std::abs(c);
-        const float               theta  = freq * m_time;
+        const float freq   = static_cast<float>(freqs[i]);
+        const auto& c      = coeffs[i];
+        const float radius = std::abs(c);
+        const float theta  = freq * m_time;
+
         const std::complex<float> sumCur =
             sumPrev
             + std::complex<float>(
                 c.real() * std::cos(theta) - c.imag() * std::sin(theta),
                 c.real() * std::sin(theta) + c.imag() * std::cos(theta));
 
-        // Circle of the current epicycle
-        sf::CircleShape circle(radius * 200.f);
-        circle.setOrigin({radius * 200.f, radius * 200.f});
-        circle.setFillColor(sf::Color::Transparent);
-        circle.setOutlineColor(circleColor);
-        circle.setOutlineThickness(1.f);
-
-        const float cx = (sumPrev.real() * 200.f) + 450.f;
-        const float cy = 700.f - ((sumPrev.imag() * 200.f) + 350.f);
-        circle.setPosition({cx, cy});
-        window.draw(circle);
-
         sumPrev = sumCur;
     }
 
-    // 3) Traced path ----------------------------------------------------------
+    // ---------- traced path ----------
     const sf::Vector2f tipPos(
         (sumPrev.real() * 200.f) + 450.f, 700.f - ((sumPrev.imag() * 200.f) + 350.f));
+
     m_path.push_back(tipPos);
     if (m_path.size() > 2000)
         m_path.erase(m_path.begin());
@@ -78,6 +67,13 @@ void Visualizer::updateAndDraw(
         pathLines[i].color    = sf::Color::Black;
     }
     window.draw(pathLines);
+
+    // ---------- red dot ----------
+    sf::CircleShape dot(4.f); // 4-pixel-radius filled circle
+    dot.setOrigin({4.f, 4.f});
+    dot.setFillColor(sf::Color::Red);
+    dot.setPosition(tipPos);
+    window.draw(dot);
 
     // 4) Clockwork ------------------------------------------------------------
     drawClockwork(window, coeffs, freqs);

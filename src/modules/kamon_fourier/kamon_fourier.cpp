@@ -25,7 +25,7 @@ static bool g_fourierInitialized = false;
 static std::vector<std::complex<float>> g_coeffs; // Fourier coefficients
 static std::vector<int>                 g_freqs;  // frequencies (indices)
 static float                            g_time          = 0.f;
-static const float                      g_speed         = 2.f;
+static const float                      g_speed         = 1.f;
 static const int                        g_numComponents = 100;
 static KamonFourier::Visualizer         g_visualizer(g_numComponents, g_speed);
 

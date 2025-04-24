@@ -37,6 +37,10 @@ size_t                                 currentFrameIdx = 0;
 bool                                   playing         = false;
 sf::Clock                              frameClock;
 
+std::vector<std::vector<sf::Vector3f>> allFrames3;
+std::vector<sf::Vector3f>              dataPoints3;
+bool                                   data3Loaded = false;
+
 float angle      = 0.f;
 int   lastMouseX = 0;
 bool  dragging   = false;
@@ -84,6 +88,29 @@ tgui::Panel::Ptr Mesh::createMeshContainer(std::function<void()> goBackCallback)
             }
         });
     panel->add(startBtn);
+
+    // After the Start button:
+    auto resetBtn = tgui::Button::create("Reset");
+    resetBtn->setSize(100, 30);
+    resetBtn->setPosition(230, 10);
+    resetBtn->onPress(
+        []
+        {
+            // stop playback
+            playing = false;
+
+            // rewind to first frame (if any)
+            currentFrameIdx = 0;
+            if (!allFrames.empty())
+                dataPoints2 = allFrames[0];
+
+            // optionally reset other runtime state
+            frameClock.restart();
+            angle = 0.f;
+
+            std::cout << "Animation reset.\n";
+        });
+    panel->add(resetBtn);
 
     fs::path base      = fs::path(__FILE__).parent_path().parent_path().parent_path().parent_path();
     fs::path kachel    = base / "meshes" / "kachelmuster.off";
@@ -137,6 +164,8 @@ tgui::Panel::Ptr Mesh::createMeshContainer(std::function<void()> goBackCallback)
     if (fs::exists(dataFolder))
     {
         loadAllFramesFromFolder(dataFolder, allFrames, dataPoints2, data2Loaded, currentFrameIdx);
+        loadAllFrames3DFromFolder(
+            dataFolder, allFrames3, dataPoints3, data3Loaded, currentFrameIdx);
     }
 
     return panel;
@@ -177,13 +206,14 @@ tgui::Panel::Ptr Mesh::createMeshTile(
 void Mesh::updateAndDraw(sf::RenderWindow& window)
 {
     // Animate CSV frames if playing
-    if (playing && frameClock.getElapsedTime().asSeconds() > 0.1f)
+    if (playing && frameClock.getElapsedTime().asSeconds() > 0.01f)
     {
         frameClock.restart();
         if (currentFrameIdx + 1 < allFrames.size())
         {
             currentFrameIdx++;
             dataPoints2 = allFrames[currentFrameIdx];
+            dataPoints3 = allFrames3[currentFrameIdx];
         }
         else
         {
@@ -227,7 +257,7 @@ void Mesh::updateAndDraw(sf::RenderWindow& window)
         // Draw CSV data points
         if (data2Loaded)
         {
-            sf::CircleShape pt(3.f);
+            sf::CircleShape pt(2.f);
             pt.setFillColor(sf::Color::Red);
             pt.setOrigin({3.f, 3.f});
             for (const auto& p : dataPoints2)
@@ -280,5 +310,25 @@ void Mesh::updateAndDraw(sf::RenderWindow& window)
         }
         window.draw(mesh3);
         window.draw(edges3);
+
+        // Draw 3-D CSV points
+        if (data3Loaded)
+        {
+            sf::CircleShape dot(1.f);
+            dot.setOrigin({3.f, 3.f});
+            dot.setFillColor(sf::Color::Red);
+
+            for (const auto& v : dataPoints3)
+            {
+                // same rotation + projection that we used for verts3
+                float x = v.x * c - v.z * s;
+                float z = v.x * s + v.z * c;
+                float y = v.y;
+
+                sf::Vector2f p{centre.x + x * scale, centre.y - y * scale};
+                dot.setPosition(p);
+                window.draw(dot);
+            }
+        }
     }
 }

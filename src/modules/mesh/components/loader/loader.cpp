@@ -156,21 +156,76 @@ void loadAllFramesFromFolder(
             // Original
             augmented.insert(augmented.end(), frame.begin(), frame.end());
 
-            // Rotated & translated variants
-            for (const auto& pt : frame)
-                augmented.push_back(customRotate(pt, 90.f, 0.f, 0.f));
-            for (const auto& pt : frame)
-                augmented.push_back(customRotate(pt, 90.f, 2.f, 0.f));
-            for (const auto& pt : frame)
-                augmented.push_back(customRotate(pt, 270.f, 0.f, 2.f));
-            for (const auto& pt : frame)
-                augmented.push_back(customRotate(pt, 270.f, 0.f, 0.f));
+            // // Rotated & translated variants
+            // for (const auto& pt : frame)
+            //     augmented.push_back(customRotate(pt, 90.f, 0.f, 0.f));
+            // for (const auto& pt : frame)
+            //     augmented.push_back(customRotate(pt, 90.f, 2.f, 0.f));
+            // for (const auto& pt : frame)
+            //     augmented.push_back(customRotate(pt, 270.f, 0.f, 2.f));
+            // for (const auto& pt : frame)
+            //     augmented.push_back(customRotate(pt, 270.f, 0.f, 0.f));
 
             allFrames.push_back(std::move(augmented));
         }
     }
 
     std::cout << "Loaded " << allFrames.size() << " augmented frames.\n";
+    if (!allFrames.empty())
+    {
+        currentPoints  = allFrames[0];
+        dataLoadedFlag = true;
+    }
+    currentFrameIdx = 0;
+}
+
+bool loadCSV3D(const std::string& file, std::vector<sf::Vector3f>& pts)
+{
+    std::ifstream in(file);
+    if (!in)
+        return false;
+
+    pts.clear();
+    std::string line;
+    while (std::getline(in, line))
+    {
+        std::istringstream ss(line);
+        float              x, y, z;
+        char               c1, c2;
+        if (ss >> x >> c1 >> y >> c2 >> z) // supports “x,y,z”
+            pts.emplace_back(x, y, z);
+    }
+    return true;
+}
+
+void loadAllFrames3DFromFolder(
+    const std::filesystem::path&            folder,
+    std::vector<std::vector<sf::Vector3f>>& allFrames,
+    std::vector<sf::Vector3f>&              currentPoints,
+    bool&                                   dataLoadedFlag,
+    size_t&                                 currentFrameIdx)
+{
+    std::vector<std::pair<int, std::filesystem::path>> files;
+    std::regex                                         pattern(R"(r_data_3D_(\d+)\.csv)");
+
+    for (const auto& entry : std::filesystem::directory_iterator(folder))
+    {
+        std::smatch m;
+        std::string name = entry.path().filename().string();
+        if (std::regex_match(name, m, pattern))
+            files.emplace_back(std::stoi(m[1]), entry.path());
+    }
+    std::sort(files.begin(), files.end());
+
+    allFrames.clear();
+    for (const auto& [_, p] : files)
+    {
+        std::vector<sf::Vector3f> frame;
+        if (loadCSV3D(p.string(), frame))
+            allFrames.push_back(std::move(frame));
+    }
+
+    std::cout << "Loaded " << allFrames.size() << " 3-D frames.\n";
     if (!allFrames.empty())
     {
         currentPoints  = allFrames[0];

@@ -41,9 +41,30 @@ std::vector<std::vector<sf::Vector3f>> allFrames3;
 std::vector<sf::Vector3f>              dataPoints3;
 bool                                   data3Loaded = false;
 
+//   Colour per particle (shared between 2-D and 3-D views)
+std::vector<std::vector<int>> allColors;
+std::vector<int>              currentColors;
+bool                          colorLoaded = false;
+
 float angle      = 0.f;
 int   lastMouseX = 0;
 bool  dragging   = false;
+
+static sf::Color codeToColour(int c)
+{
+    switch (c)
+    {
+    case 7:
+        return sf::Color::Green;
+    case 5:
+        return sf::Color::Red;
+    case 8:
+    case 9:
+        return sf::Color(128, 0, 128);
+    default:
+        return sf::Color::Blue;
+    }
+}
 
 using Edge = std::pair<unsigned, unsigned>;
 struct EdgeHash
@@ -166,6 +187,8 @@ tgui::Panel::Ptr Mesh::createMeshContainer(std::function<void()> goBackCallback)
         loadAllFramesFromFolder(dataFolder, allFrames, dataPoints2, data2Loaded, currentFrameIdx);
         loadAllFrames3DFromFolder(
             dataFolder, allFrames3, dataPoints3, data3Loaded, currentFrameIdx);
+        loadAllColorFramesFromFolder(
+            dataFolder, allColors, currentColors, colorLoaded, currentFrameIdx);
     }
 
     return panel;
@@ -212,8 +235,9 @@ void Mesh::updateAndDraw(sf::RenderWindow& window)
         if (currentFrameIdx + 1 < allFrames.size())
         {
             currentFrameIdx++;
-            dataPoints2 = allFrames[currentFrameIdx];
-            dataPoints3 = allFrames3[currentFrameIdx];
+            dataPoints2   = allFrames[currentFrameIdx];
+            dataPoints3   = allFrames3[currentFrameIdx];
+            currentColors = allColors[currentFrameIdx];
         }
         else
         {
@@ -260,9 +284,11 @@ void Mesh::updateAndDraw(sf::RenderWindow& window)
             sf::CircleShape pt(2.f);
             pt.setFillColor(sf::Color::Red);
             pt.setOrigin({3.f, 3.f});
-            for (const auto& p : dataPoints2)
+            for (size_t i = 0; i < dataPoints2.size(); ++i)
             {
-                pt.setPosition(tr.transformPoint(p));
+                pt.setFillColor(codeToColour(
+                    (colorLoaded && i < currentColors.size()) ? currentColors[i] : -1));
+                pt.setPosition(tr.transformPoint(dataPoints2[i]));
                 window.draw(pt);
             }
         }
@@ -312,14 +338,20 @@ void Mesh::updateAndDraw(sf::RenderWindow& window)
         window.draw(edges3);
 
         // Draw 3-D CSV points
+        // Draw 3-D CSV points
         if (data3Loaded)
         {
-            sf::CircleShape dot(1.f);
-            dot.setOrigin({3.f, 3.f});
-            dot.setFillColor(sf::Color::Red);
+            sf::CircleShape dot(2.f);
+            dot.setOrigin({3.f, 3.f}); // keep the same radius/origin
 
-            for (const auto& v : dataPoints3)
+            for (size_t i = 0; i < dataPoints3.size(); ++i)
             {
+                const auto& v = dataPoints3[i];
+
+                // ─── colour per particle ─────────────────────────────────────────
+                dot.setFillColor(codeToColour(
+                    (colorLoaded && i < currentColors.size()) ? currentColors[i] : -1));
+
                 // same rotation + projection that we used for verts3
                 float x = v.x * c - v.z * s;
                 float z = v.x * s + v.z * c;

@@ -234,4 +234,56 @@ void loadAllFrames3DFromFolder(
     currentFrameIdx = 0;
 }
 
+// ─── 1-D CSV with integers ───────────────────────────────────────────────
+bool loadColorCodes(const std::string& file, std::vector<int>& codes)
+{
+    std::ifstream in(file);
+    if (!in)
+        return false;
+
+    codes.clear();
+    int value;
+    while (in >> value) // one integer per line (optionally separated by whitespace)
+        codes.push_back(value);
+
+    return true;
+}
+
+// ─── Folder scan:  particles_color_<N>.csv  → one frame ──────────────────
+void loadAllColorFramesFromFolder(
+    const std::filesystem::path&   folder,
+    std::vector<std::vector<int>>& allColorFrames,
+    std::vector<int>&              currentCodes,
+    bool&                          dataLoadedFlag,
+    size_t&                        currentFrameIdx)
+{
+    std::vector<std::pair<int, std::filesystem::path>> files;
+    std::regex                                         pattern(R"(particles_color_(\d+)\.csv)");
+
+    for (const auto& entry : std::filesystem::directory_iterator(folder))
+    {
+        std::smatch       m;
+        const std::string name = entry.path().filename().string();
+        if (std::regex_match(name, m, pattern))
+            files.emplace_back(std::stoi(m[1]), entry.path());
+    }
+    std::sort(files.begin(), files.end());
+
+    allColorFrames.clear();
+    for (const auto& [_, p] : files)
+    {
+        std::vector<int> frame;
+        if (loadColorCodes(p.string(), frame))
+            allColorFrames.push_back(std::move(frame));
+    }
+
+    std::cout << "Loaded " << allColorFrames.size() << " colour frames.\n";
+    if (!allColorFrames.empty())
+    {
+        currentCodes    = allColorFrames.front();
+        dataLoadedFlag  = true;
+        currentFrameIdx = 0;
+    }
+}
+
 } // namespace mesh::loader

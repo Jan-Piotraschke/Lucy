@@ -36,4 +36,14 @@ void loadAllFramesFromFolder(
     bool&                                   dataLoadedFlag,
     size_t&                                 currentFrameIdx);
 
+// ─── Colour (1-D int) CSV ────────────────────────────────────────────────
+bool loadColorCodes(const std::string& file, std::vector<int>& codes);
+
+void loadAllColorFramesFromFolder(
+    const std::filesystem::path&   folder,
+    std::vector<std::vector<int>>& allColorFrames,
+    std::vector<int>&              currentCodes,
+    bool&                          dataLoadedFlag,
+    size_t&                        currentFrameIdx);
+
 } // namespace mesh::loader

@@ -27,8 +27,8 @@ tgui::Panel::Ptr g_fourierPanel = nullptr;
 static bool g_fourierInitialized = false;
 
 // Fourier data
-static std::vector<std::complex<float>> g_coeffs;   // Fourier coefficients
-static std::vector<int>                 g_freqs;    // integer frequencies
+static std::vector<std::complex<float>> g_coeffs; // Fourier coefficients
+static std::vector<int>                 g_freqs;  // integer frequencies
 static float                            g_time          = 0.f;
 static const float                      g_speed         = 1.f;
 static const int                        g_numComponents = 65;
@@ -96,13 +96,13 @@ void computeFourier(const std::vector<sf::Vector2f>& pts)
     }
 
     // --- 2.1  Prepare input / output buffers for KissFFT ---------------------
-    std::vector<kiss_fft_cpx> in (N);
+    std::vector<kiss_fft_cpx> in(N);
     std::vector<kiss_fft_cpx> out(N);
 
     for (int n = 0; n < N; ++n)
     {
-        in[n].r = pts[n].x;          // real  = x-coordinate
-        in[n].i = pts[n].y;          // imag  = y-coordinate
+        in[n].r = pts[n].x; // real  = x-coordinate
+        in[n].i = pts[n].y; // imag  = y-coordinate
     }
 
     kiss_fft_cfg cfg = kiss_fft_alloc(N, /*inverse=*/0, nullptr, nullptr);
@@ -113,38 +113,38 @@ void computeFourier(const std::vector<sf::Vector2f>& pts)
     }
 
     kiss_fft(cfg, in.data(), out.data());
-    std::free(cfg);   // KissFFT was malloc()-based
+    std::free(cfg); // KissFFT was malloc()-based
 
     // --- 2.2  Copy + normalise to std::complex<float> ------------------------
-    const float invN = 1.0f / static_cast<float>(N);
+    const float                      invN = 1.0f / static_cast<float>(N);
     std::vector<std::complex<float>> cplx(N);
     for (int k = 0; k < N; ++k)
         cplx[k] = std::complex<float>(out[k].r * invN, out[k].i * invN);
 
     // --- 2.3  Map indices to signed frequencies and sort by magnitude --------
-    std::vector<std::pair<int,float>> magIndex;
+    std::vector<std::pair<int, float>> magIndex;
     magIndex.reserve(N);
     for (int k = 0; k < N; ++k)
     {
-        const int   freq      = (k <= N/2) ?  k : (k - N);  // wrap negatives
+        const int   freq      = (k <= N / 2) ? k : (k - N); // wrap negatives
         const float magnitude = std::abs(cplx[k]);
         magIndex.emplace_back(freq, magnitude);
     }
-    std::sort(magIndex.begin(), magIndex.end(),
-              [](auto& a, auto& b){ return a.second > b.second; });
+    std::sort(
+        magIndex.begin(), magIndex.end(), [](auto& a, auto& b) { return a.second > b.second; });
 
     // --- 2.4  Keep only the strongest g_numComponents harmonics --------------
     const int keep = std::min(g_numComponents, static_cast<int>(magIndex.size()));
     g_coeffs.resize(keep);
-    g_freqs .resize(keep);
+    g_freqs.resize(keep);
 
     for (int i = 0; i < keep; ++i)
     {
-        const int freqIndex = magIndex[i].first;             // signed frequency
-        const int rawIndex  = (freqIndex >= 0) ? freqIndex   // 0 … N-1 index
+        const int freqIndex = magIndex[i].first;           // signed frequency
+        const int rawIndex  = (freqIndex >= 0) ? freqIndex // 0 … N-1 index
                                                : (freqIndex + N);
-        g_coeffs[i] = cplx[rawIndex];
-        g_freqs [i] = freqIndex;
+        g_coeffs[i]         = cplx[rawIndex];
+        g_freqs[i]          = freqIndex;
     }
 }
 
@@ -153,7 +153,8 @@ void computeFourier(const std::vector<sf::Vector2f>& pts)
 // ──────────────────────────────────────────────────────────────────────────────
 void initFourierData()
 {
-    if (g_fourierInitialized) return;
+    if (g_fourierInitialized)
+        return;
 
     // Load from SVG first, fall back to PNG
     const std::string svgPath = "assets/kamon.svg";
@@ -195,9 +196,7 @@ std::complex<float> evalEpicycles(float t)
     return sum;
 }
 
-} // ───── end anonymous namespace ──────────────────────────────────────────────
-
-
+} // namespace
 
 // ──────────────────────────────────────────────────────────────────────────────
 // 5) Public API – unchanged except that it now benefits from KissFFT speed
@@ -217,7 +216,12 @@ tgui::Panel::Ptr createKamonFourierContainer(const std::function<void()>& onBack
 
     auto backBtn = tgui::Button::create("Back to Home");
     backBtn->setPosition({0.f, 0.f});
-    backBtn->onPress([onBackHome]{ if (onBackHome) onBackHome(); });
+    backBtn->onPress(
+        [onBackHome]
+        {
+            if (onBackHome)
+                onBackHome();
+        });
     content->add(backBtn);
 
     return g_fourierPanel;
@@ -245,18 +249,27 @@ tgui::Panel::Ptr createFourierTile(const std::function<void()>& openCallback)
     auto btn = tgui::Button::create("OPEN");
     btn->setPosition(10, 80);
     btn->setSize(70, 30);
-    btn->onPress([openCallback]{ if (openCallback) openCallback(); });
+    btn->onPress(
+        [openCallback]
+        {
+            if (openCallback)
+                openCallback();
+        });
     panel->add(btn);
 
     return panel;
 }
 
-tgui::Panel::Ptr getFourierPanel() { return g_fourierPanel; }
+tgui::Panel::Ptr getFourierPanel()
+{
+    return g_fourierPanel;
+}
 
 void updateAndDraw(sf::RenderWindow& window)
 {
     initFourierData();
-    if (!g_fourierInitialized) return;
+    if (!g_fourierInitialized)
+        return;
 
     g_visualizer.updateAndDraw(window, g_coeffs, g_freqs);
 }

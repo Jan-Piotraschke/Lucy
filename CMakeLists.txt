@@ -75,6 +75,11 @@ find_package(quirc CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
 
 # ------------------------------------------------------------------------------
+# 6) Find kissfft (float version)
+# ------------------------------------------------------------------------------
+find_package(kissfft CONFIG REQUIRED COMPONENTS float)
+
+# ------------------------------------------------------------------------------
 # 7) Create the executable and link libraries
 # ------------------------------------------------------------------------------
 add_executable(main
@@ -96,6 +101,7 @@ target_link_libraries(main
         TGUI::TGUI
         ${OpenCV_LIBS}
         quirc::quirc
+        kissfft::kissfft-float
 )
 
 set_target_properties(main PROPERTIES

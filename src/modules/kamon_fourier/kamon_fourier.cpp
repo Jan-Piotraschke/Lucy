@@ -4,14 +4,19 @@
 
 #include <TGUI/TGUI.hpp>
 #include <cmath>
-#include <complex> // for std::complex
+#include <complex>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <sstream>
 #include <vector>
 
-// Anonymous namespace for local data/functions
+#include <kissfft/kiss_fft.h>
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Anonymous namespace – local data / helpers
+// ──────────────────────────────────────────────────────────────────────────────
 namespace
 {
 
@@ -22,11 +27,11 @@ tgui::Panel::Ptr g_fourierPanel = nullptr;
 static bool g_fourierInitialized = false;
 
 // Fourier data
-static std::vector<std::complex<float>> g_coeffs; // Fourier coefficients
-static std::vector<int>                 g_freqs;  // frequencies (indices)
+static std::vector<std::complex<float>> g_coeffs;   // Fourier coefficients
+static std::vector<int>                 g_freqs;    // integer frequencies
 static float                            g_time          = 0.f;
 static const float                      g_speed         = 1.f;
-static const int                        g_numComponents = 100;
+static const int                        g_numComponents = 65;
 static KamonFourier::Visualizer         g_visualizer(g_numComponents, g_speed);
 
 // The contour we attempt to trace
@@ -39,9 +44,9 @@ static std::vector<sf::Vector2f> g_path;
 static const int W_WIDTH  = 900;
 static const int W_HEIGHT = 700;
 
-// -----------------------------------------------------------------------------
-// 3) Normalize to [-1,1] range (same as before)
-// -----------------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────────────
+// 1) Normalise points into the range [-1, 1]
+// ──────────────────────────────────────────────────────────────────────────────
 void normalize(std::vector<sf::Vector2f>& pts)
 {
     if (pts.empty())
@@ -77,124 +82,126 @@ void normalize(std::vector<sf::Vector2f>& pts)
     }
 }
 
-// -----------------------------------------------------------------------------
-// 4) A naive O(N^2) DFT (same as your “fixed” approach) for correctness
-// -----------------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────────────
+// 2) Compute Fourier coefficients with KissFFT  (O(N log N))
+//    We treat every point as the complex sample  z[n] = x[n] + i·y[n]
+// ──────────────────────────────────────────────────────────────────────────────
 void computeFourier(const std::vector<sf::Vector2f>& pts)
 {
-    int N = (int)pts.size();
+    const int N = static_cast<int>(pts.size());
     if (N < 2)
     {
         std::cerr << "[KamonFourier] Not enough points to compute FFT.\n";
         return;
     }
 
-    std::vector<std::complex<float>> cplx(N, std::complex<float>(0, 0));
-    const float                      TWO_PI = 6.28318530718f;
+    // --- 2.1  Prepare input / output buffers for KissFFT ---------------------
+    std::vector<kiss_fft_cpx> in (N);
+    std::vector<kiss_fft_cpx> out(N);
 
-    for (int k = 0; k < N; k++)
+    for (int n = 0; n < N; ++n)
     {
-        std::complex<float> sum(0.f, 0.f);
-        for (int n = 0; n < N; n++)
-        {
-            float xn    = pts[n].x;
-            float yn    = pts[n].y;
-            float angle = -TWO_PI * float(k) * float(n) / float(N);
-            float cosA  = std::cos(angle);
-            float sinA  = std::sin(angle);
-
-            float re = xn * cosA + yn * sinA;
-            float im = -xn * sinA + yn * cosA;
-            sum += std::complex<float>(re, im);
-        }
-        sum /= float(N);
-        cplx[k] = sum;
+        in[n].r = pts[n].x;          // real  = x-coordinate
+        in[n].i = pts[n].y;          // imag  = y-coordinate
     }
 
-    // interpret negative freq if k > N/2 => freq = k - N
-    std::vector<std::pair<int, float>> magIndex;
+    kiss_fft_cfg cfg = kiss_fft_alloc(N, /*inverse=*/0, nullptr, nullptr);
+    if (!cfg)
+    {
+        std::cerr << "[KamonFourier] KissFFT allocation failed.\n";
+        return;
+    }
+
+    kiss_fft(cfg, in.data(), out.data());
+    std::free(cfg);   // KissFFT was malloc()-based
+
+    // --- 2.2  Copy + normalise to std::complex<float> ------------------------
+    const float invN = 1.0f / static_cast<float>(N);
+    std::vector<std::complex<float>> cplx(N);
+    for (int k = 0; k < N; ++k)
+        cplx[k] = std::complex<float>(out[k].r * invN, out[k].i * invN);
+
+    // --- 2.3  Map indices to signed frequencies and sort by magnitude --------
+    std::vector<std::pair<int,float>> magIndex;
     magIndex.reserve(N);
-    for (int k = 0; k < N; k++)
+    for (int k = 0; k < N; ++k)
     {
-        int   freq      = (k <= N / 2) ? k : (k - N);
-        float magnitude = std::abs(cplx[k]);
-        magIndex.push_back({freq, magnitude});
+        const int   freq      = (k <= N/2) ?  k : (k - N);  // wrap negatives
+        const float magnitude = std::abs(cplx[k]);
+        magIndex.emplace_back(freq, magnitude);
     }
-    std::sort(
-        magIndex.begin(), magIndex.end(), [&](auto& a, auto& b) { return a.second > b.second; });
+    std::sort(magIndex.begin(), magIndex.end(),
+              [](auto& a, auto& b){ return a.second > b.second; });
 
-    g_coeffs.clear();
-    g_freqs.clear();
-    g_coeffs.resize(g_numComponents);
-    g_freqs.resize(g_numComponents);
+    // --- 2.4  Keep only the strongest g_numComponents harmonics --------------
+    const int keep = std::min(g_numComponents, static_cast<int>(magIndex.size()));
+    g_coeffs.resize(keep);
+    g_freqs .resize(keep);
 
-    for (int i = 0; i < g_numComponents; i++)
+    for (int i = 0; i < keep; ++i)
     {
-        int freqIndex = magIndex[i].first;
-        int cplxIndex = (freqIndex >= 0) ? freqIndex : (freqIndex + N);
-        g_coeffs[i]   = cplx[cplxIndex];
-        g_freqs[i]    = freqIndex;
+        const int freqIndex = magIndex[i].first;             // signed frequency
+        const int rawIndex  = (freqIndex >= 0) ? freqIndex   // 0 … N-1 index
+                                               : (freqIndex + N);
+        g_coeffs[i] = cplx[rawIndex];
+        g_freqs [i] = freqIndex;
     }
 }
 
-// -----------------------------------------------------------------------------
-// 5) Initialize data once
-// -----------------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────────────
+// 3) Initialise (load contour → normalise → FFT → reset timers)
+// ──────────────────────────────────────────────────────────────────────────────
 void initFourierData()
 {
-    if (g_fourierInitialized)
-        return;
+    if (g_fourierInitialized) return;
 
-    // Try to load from SVG first. If that fails, fallback to the PNG.
-    std::string svgPath = "assets/kamon.svg";
-    std::string pngPath = "assets/kamon_fourier.png";
+    // Load from SVG first, fall back to PNG
+    const std::string svgPath = "assets/kamon.svg";
+    const std::string pngPath = "assets/kamon_fourier.png";
 
     using namespace KamonFourier::ContourExtractor;
-
     g_contourPoints = extractContourFromSVG(svgPath);
     if (g_contourPoints.empty())
     {
-        std::cerr << "[KamonFourier] Falling back to PNG contour...\n";
+        std::cerr << "[KamonFourier] Falling back to PNG contour…\n";
         g_contourPoints = extractLargestContour(pngPath);
     }
-
     if (g_contourPoints.empty())
     {
-        std::cerr << "[KamonFourier] Could not load any valid contour from SVG or PNG.\n";
+        std::cerr << "[KamonFourier] Could not load any valid contour.\n";
         return;
     }
 
-    // 2) normalize to [-1,1]
-    normalize(g_contourPoints);
-
-    // 3) do naive DFT
-    computeFourier(g_contourPoints);
+    normalize(g_contourPoints);      // scale to unit square
+    computeFourier(g_contourPoints); // KissFFT
 
     g_fourierInitialized = true;
     g_path.clear();
     g_time = 0.f;
 }
 
-// -----------------------------------------------------------------------------
-// 6) Evaluate epicycles sum at time t, etc. (same as before)
-// -----------------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────────────
+// 4) Evaluate epicycle sum   f(t) = Σ C_k · e^{i·ω_k·t}
+// ──────────────────────────────────────────────────────────────────────────────
 std::complex<float> evalEpicycles(float t)
 {
-    std::complex<float> sum(0, 0);
-    for (int i = 0; i < g_numComponents; i++)
+    std::complex<float> sum(0.f, 0.f);
+    for (std::size_t i = 0; i < g_coeffs.size(); ++i)
     {
-        float               theta = g_freqs[i] * t;
-        std::complex<float> e(std::cos(theta), std::sin(theta));
+        const float               theta = g_freqs[i] * t;
+        const std::complex<float> e(std::cos(theta), std::sin(theta));
         sum += g_coeffs[i] * e;
     }
     return sum;
 }
 
-} // end anonymous namespace
+} // ───── end anonymous namespace ──────────────────────────────────────────────
 
-// -----------------------------------------------------------------------------
-// 7) Public API in KamonFourier namespace
-// -----------------------------------------------------------------------------
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 5) Public API – unchanged except that it now benefits from KissFFT speed
+// ──────────────────────────────────────────────────────────────────────────────
 namespace KamonFourier
 {
 
@@ -210,12 +217,7 @@ tgui::Panel::Ptr createKamonFourierContainer(const std::function<void()>& onBack
 
     auto backBtn = tgui::Button::create("Back to Home");
     backBtn->setPosition({0.f, 0.f});
-    backBtn->onPress(
-        [onBackHome]()
-        {
-            if (onBackHome)
-                onBackHome();
-        });
+    backBtn->onPress([onBackHome]{ if (onBackHome) onBackHome(); });
     content->add(backBtn);
 
     return g_fourierPanel;
@@ -243,27 +245,18 @@ tgui::Panel::Ptr createFourierTile(const std::function<void()>& openCallback)
     auto btn = tgui::Button::create("OPEN");
     btn->setPosition(10, 80);
     btn->setSize(70, 30);
-    btn->onPress(
-        [openCallback]()
-        {
-            if (openCallback)
-                openCallback();
-        });
+    btn->onPress([openCallback]{ if (openCallback) openCallback(); });
     panel->add(btn);
 
     return panel;
 }
 
-tgui::Panel::Ptr getFourierPanel()
-{
-    return g_fourierPanel;
-}
+tgui::Panel::Ptr getFourierPanel() { return g_fourierPanel; }
 
 void updateAndDraw(sf::RenderWindow& window)
 {
     initFourierData();
-    if (!g_fourierInitialized)
-        return;
+    if (!g_fourierInitialized) return;
 
     g_visualizer.updateAndDraw(window, g_coeffs, g_freqs);
 }

@@ -67,6 +67,10 @@ Die zu trainierenden menschlichen Sprachen richten sich danach aus, was der Foku
 Wenn ein Business z.B. auf die Verbindung zwischen Deutschland und Japan ausgerichtet ist, dann muss es nur japanisch und deutsch verstehen. Dies reduziert den benötigten Trainingsraum.
 Somit kann ein PINN mit einen SLM als AIoT geshipt werden. Das PINN versteht die Physik des zu untersuchenden State und das SLM kann mit der Umwelt darüber kommunizieren. Alles lokal on-device.
 
+5.1.1 Use-Case
+Case 1: patienten-kritische Entscheidungen (ggf. mit Echtzeitfeedback): Aufbauend auf einen Physik Model erkundet die AI den Physik Raum und optimiert das Model -> "White Box Insight durch Physik"
+Case AIoT: pattern recognition und Aktivierung von Prozessen -> "AI as a Sensor"
+
 6. Fazit & Nutzen
 
 Diese Strategie ermöglicht eine konsistente, ressourcenschonende Benutzeroberfläche, die sowohl technisch effizient als auch kulturell durchdacht ist.

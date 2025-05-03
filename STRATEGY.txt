@@ -2,7 +2,11 @@
 
 1. Zielsetzung
 
-Ziel dieser Strategie ist die Entwicklung einer minimalistischen, retro-inspirierten Benutzeroberfläche mit äußerst geringem Speicher- und CPU-Bedarf, um maximale Ressourcen für ein eingebettetes KI-Modell (Small Language Model) bereitzustellen. Gleichzeitig soll die UI kulturell ansprechend für Nutzern in Deutschland und Japan gestaltet sein.
+Ziel dieser Strategie ist die Entwicklung einer minimalistischen, retro-inspirierten Benutzeroberfläche mit äußerst geringem Speicher- und CPU-Bedarf, um maximale Ressourcen für ein eingebettetes KI-Modell (Small Language Model) bereitzustellen.
+Gleichzeitig soll die UI kulturell ansprechend für Nutzern in Deutschland und Japan gestaltet sein.
+Großartige technische Erfindungen haben genial angefangen, wobei sie einfach gehalten waren.
+Mein Produkt sehe ich so an, dass es immer wie „day 1“ ist, nämlich eine Technik, die am day 1 der modernen IT Welt entstanden sein könnte und schon damals dem Wohle der Menschen dienen könnte.
+Entsprechend halten wir unser Designprinzip.
 
 2. Designprinzipien & Ästhetik
 
@@ -12,7 +16,7 @@ Ziel dieser Strategie ist die Entwicklung einer minimalistischen, retro-inspirie
 - Kulturelle Farbakzente: Zurückhaltende Integration regionaler Farben (z. B. Indigo-Blau für Japan, Basalt-Grau für Deutschland).
 
 2.2 ✒️ Typografie
-- Monospaced Pixel-Fonts: Verwendung bitmap-basierter Pixel-Schriftarten (z. B. „Press Start 2P“, „Pixel Operator“, „Silkscreen“) zur Vermeidung komplexer Vektorberechnungen.
+- Monospaced Pixel-Fonts: Verwendung bitmap-basierter Pixel-Schriftarten (z. B. Apple Macintosh 1984, „Press Start 2P“, „Pixel Operator“, „Silkscreen“) zur Vermeidung komplexer Vektorberechnungen.
 - Mehrsprachigkeit: Optimierung für lateinische und japanische Schriftzeichen in gleicher Fontstruktur.
 
 2.3 Layout

@@ -69,7 +69,7 @@ int main()
     window.setFramerateLimit(60);
 
     tgui::Gui gui(window);
-    gui.setFont("assets/runescape_uf.ttf");
+    gui.setFont("assets/ChicagoKare-Regular.ttf");
 
     // -----------------------------------------
     // 2) State variables

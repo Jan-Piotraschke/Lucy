@@ -84,6 +84,7 @@ find_package(kissfft CONFIG REQUIRED COMPONENTS float)
 # ------------------------------------------------------------------------------
 add_executable(main
     src/main.cpp
+    src/screens/homepage_screen.cpp
     src/modules/tile/hexagon_tile.cpp
     src/modules/mesh/mesh.cpp
     src/modules/mesh/components/loader/loader.cpp

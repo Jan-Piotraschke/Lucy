@@ -8,3 +8,6 @@
 [submodule "src/modules/2DTissue"]
 	path = src/modules/2DTissue
 	url = git@github.com:Jan-Piotraschke/2DTissue.git
+[submodule "src/PinnTrainer"]
+	path = src/PinnTrainer
+	url = https://github.com/Jan-Piotraschke/PinnTrainer

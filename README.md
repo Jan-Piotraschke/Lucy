@@ -69,6 +69,16 @@ strip -x build/bin/main
 find . -type f \( -name "*.cpp" -o -name "*.h" \) ! -name "argparse.hpp" -exec clang-format -i {} \;
 ```
 
+## Styling
+
+### Pixelated kamon
+
+Change the pixelated kamon version using this command from ImageMagick:
+
+```bash
+magick assets/kamon.png -scale 160x160 -alpha off -depth 8 -colors 2 -scale 512x512 -filter point assets/kamon_pixelated.png
+```
+
 
 ## Upgrading SFML
 

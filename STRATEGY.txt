@@ -70,10 +70,20 @@ Somit können sich die SLM AI Agents wie "aktive Partikel" verhalten und deren h
 Die zu trainierenden menschlichen Sprachen richten sich danach aus, was der Fokusraum des jeweiligen Business ist. Eine AI muss nicht alle menschlichen Sprachen können. Ein Mensch kann es auch nicht.
 Wenn ein Business z.B. auf die Verbindung zwischen Deutschland und Japan ausgerichtet ist, dann muss es nur japanisch und deutsch verstehen. Dies reduziert den benötigten Trainingsraum.
 Somit kann ein PINN mit einen SLM als AIoT geshipt werden. Das PINN versteht die Physik des zu untersuchenden State und das SLM kann mit der Umwelt darüber kommunizieren. Alles lokal on-device.
+PINN sind dafür da, „Black Swans“ aufzudecken, die bisher nicht in historischen Ereignissen aufgetreten sind, aber katastrophale Auswirkungen hätten.
 
 5.1.1 Use-Case
-Case 1: patienten-kritische Entscheidungen (ggf. mit Echtzeitfeedback): Aufbauend auf einen Physik Model erkundet die AI den Physik Raum und optimiert das Model -> "White Box Insight durch Physik"
-Case AIoT: pattern recognition und Aktivierung von Prozessen -> "AI as a Sensor"
+Case 1: patienten-kritische Entscheidungen (ggf. mit Echtzeitfeedback): Aufbauend auf einen Physik Model erkundet die AI (basierend auf der PINN Infrastruktur) den Physik Raum und optimiert das Model -> "White Box Insight durch Physik".
+Dieses Physik Model wird dann deployed.
+Sollte der Nutzer für sich akzeptieren, dass er momentan nicht die vollständige Physik seines Zielobjektes verstehen kann und bereit ist, die
+1. Interpretationsfähigkeit (z.B. Bifurkation und Co.) und
+2. Digital Twin Sync Fähigkeit des Physik Models
+aufzugeben, dann kann das PINN stattdessen deployed werden, welches generalisierter die sparse / noisy Daten auswerten kann.
+
+Dies unter Vorbehalt, dass beide Modelle auf einen Analogcomputer laufen können und der Punkt computational constraints somit wegfällt.
+Sonst hätte das PINN noch den Nachtteil seiner Größe und den damit bewirkten computational constraint.
+
+Case AIoT (SLM bzw. PINN): pattern recognition und anschließender Aktivierung von Prozessen -> "AI as a Sensor"
 
 6. Fazit & Nutzen
 

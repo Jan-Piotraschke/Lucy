@@ -16,6 +16,8 @@
 #include <numeric>
 #include <vector>
 
+// TODO: wir sollten in der Gingko Blatt Kerbe mit der Simulation anfangen!
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Local constants & aliases
 // ──────────────────────────────────────────────────────────────────────────────
@@ -24,7 +26,7 @@ namespace
 using complexf = std::complex<float>;
 
 constexpr float kSpeed         = 1.0f;
-constexpr int   kNumComponents = 65;
+constexpr int   kNumComponents = 48;  // bei "24" sieht man gerade noch das kamon
 
 // ──────────────────────────────────────────────────────────────────────────────
 // RAII helper for kiss_fft_cfg
@@ -167,8 +169,8 @@ void initFourierData()
 
     using namespace KamonFourier::ContourExtractor;
 
-    constexpr char kSvgPath[] = "assets/kamon.svg";
-    constexpr char kPngPath[] = "assets/kamon_fourier.png";
+    constexpr char kSvgPath[] = "assets/img/kamon.svg";
+    constexpr char kPngPath[] = "assets/img/kamon_fourier.png";
 
     g_state.contourPts = extractContourFromSVG(kSvgPath);
     if (g_state.contourPts.empty())

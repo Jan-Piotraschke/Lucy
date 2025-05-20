@@ -39,7 +39,7 @@ class WelcomeScreen
         m_panel->add(m_videoDisplay);
 
         // Load input image
-        cv::Mat grayImage = cv::imread("assets/kamon_fourier.png", cv::IMREAD_GRAYSCALE);
+        cv::Mat grayImage = cv::imread("assets/img/kamon_fourier.png", cv::IMREAD_GRAYSCALE);
         if (grayImage.empty())
         {
             std::cerr << "Error: Could not load welcome image.\n";

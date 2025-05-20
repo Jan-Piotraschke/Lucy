@@ -69,7 +69,7 @@ int main()
     window.setFramerateLimit(60);
 
     tgui::Gui gui(window);
-    gui.setFont("assets/ChicagoKare-Regular.ttf");
+    gui.setFont("assets/font/ChicagoKare-Regular.ttf");
 
     // ── 2) Floating child‑windows (created first but *added* later)
     auto menuWindow    = tgui::ChildWindow::create("Menu");

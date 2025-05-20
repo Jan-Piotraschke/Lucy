@@ -53,7 +53,7 @@ tgui::Panel::Ptr createHomepagePanel(
     homeContent->setPosition(0, 50);
     panel->add(homeContent);
 
-    auto logo = tgui::Picture::create("assets/kamon_pixelated.png");
+    auto logo = tgui::Picture::create("assets/img/kamon_pixelated.png");
     logo->setSize(180, 180);
     logo->setPosition({"(&.width - width)/2", 50});
     homeContent->add(logo);

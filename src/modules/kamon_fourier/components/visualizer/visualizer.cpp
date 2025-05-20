@@ -14,7 +14,7 @@ Visualizer::Visualizer(int numComponents, float speed)
     : m_speed(speed), m_time(0.f), m_numComponents(numComponents)
 {
     m_path.reserve(2000);
-    m_bgLoaded = loadBackground("assets/niwa.png");
+    m_bgLoaded = loadBackground("assets/img/niwa.png");
 }
 
 bool Visualizer::loadBackground(const std::string& filename)

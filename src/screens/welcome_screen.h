@@ -5,8 +5,8 @@
 #include <SFML/System.hpp>
 #include <TGUI/AllWidgets.hpp>
 
+#include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/videoio.hpp>
 
 #include <algorithm>
 #include <iostream>
@@ -22,11 +22,11 @@ class WelcomeScreen
         sf::Color           bgColor   = sf::Color(255, 255, 255),
         sf::Color           textColor = sf::Color(0, 51, 102))
         : m_gui(gui)
-        , m_duration(4.25f)
+        , m_duration(5.0f)
         , m_fadeDuration(0.3f)
-        , m_videoLoaded(false)
+        , m_animationDone(false)
         , m_lastFrameTime(0.f)
-        , m_frameInterval(1.0f / 30.f) // fallback FPS
+        , m_frameInterval(1.0f / 60.f) // animation frame rate
     {
         m_panel = tgui::Panel::create(
             {static_cast<float>(windowSize.x), static_cast<float>(windowSize.y)});
@@ -38,54 +38,25 @@ class WelcomeScreen
         m_videoDisplay->setPosition({"(&.width - width)/2", "20%"});
         m_panel->add(m_videoDisplay);
 
-        m_videoCap.open("assets/welcome_animation.mp4");
-        if (m_videoCap.isOpened() && m_videoCap.read(m_cvFrame) && !m_cvFrame.empty())
+        // Load input image
+        cv::Mat grayImage = cv::imread("assets/kamon_fourier.png", cv::IMREAD_GRAYSCALE);
+        if (grayImage.empty())
         {
-            const unsigned int frameWidth  = m_cvFrame.cols;
-            const unsigned int frameHeight = m_cvFrame.rows;
-
-            m_videoDisplay->setSize(
-                {static_cast<float>(frameWidth), static_cast<float>(frameHeight)});
-            m_cvFrameRGBA.create(frameHeight, frameWidth, CV_8UC4);
-            cv::cvtColor(m_cvFrame, m_cvFrameRGBA, cv::COLOR_BGR2RGBA);
-
-            m_sfmlVideoTexture = sf::Texture(sf::Vector2u(frameWidth, frameHeight));
-            m_sfmlVideoTexture.update(m_cvFrameRGBA.data);
-
-            m_tguiVideoTexture.loadFromPixelData({frameWidth, frameHeight}, m_cvFrameRGBA.data);
-            m_videoDisplay->getRenderer()->setTexture(m_tguiVideoTexture);
-            m_videoLoaded = true;
-
-            double fps = m_videoCap.get(cv::CAP_PROP_FPS);
-            if (fps > 0.1)
-            {
-                m_frameInterval = 1.0 / fps;
-            }
-
-            m_videoCap.set(cv::CAP_PROP_POS_FRAMES, 0);
-        }
-        else
-        {
-            std::cerr << "Info: WelcomeScreen - Could not open or read video, falling back.\n";
-            m_videoLoaded = false;
+            std::cerr << "Error: Could not load welcome image.\n";
+            return;
         }
 
-        if (!m_videoLoaded)
-        {
-            tgui::Texture fallbackTexture("assets/kamon_fourier.png");
-            if (fallbackTexture.getImageSize() != tgui::Vector2u{0, 0})
-            {
-                m_videoDisplay->getRenderer()->setTexture(fallbackTexture);
-                tgui::Vector2u fbSize = fallbackTexture.getImageSize();
-                m_videoDisplay->setSize(
-                    {static_cast<float>(fbSize.x), static_cast<float>(fbSize.y)});
-            }
-            else
-            {
-                std::cerr << "Error: WelcomeScreen - Fallback image load failed.\n";
-                m_videoDisplay->setSize(180.f, 180.f);
-            }
-        }
+        cv::resize(grayImage, grayImage, cv::Size(160, 160), 0, 0, cv::INTER_NEAREST);
+        m_blackMask = grayImage < 128;
+
+        m_currentMask  = cv::Mat::zeros(m_blackMask.size(), CV_8U);
+        int revealRows = static_cast<int>(0.6 * m_blackMask.rows);
+        m_blackMask.rowRange(0, revealRows).copyTo(m_currentMask.rowRange(0, revealRows));
+
+        m_cvFrameRGBA.create(160, 160, CV_8UC4);
+        updateMaskTexture();
+
+        m_videoDisplay->setSize({240, 240});
 
         m_label = tgui::Label::create(message);
         m_label->setTextSize(48);
@@ -112,31 +83,27 @@ class WelcomeScreen
         else
             m_panel->getRenderer()->setOpacity(1.f);
 
-        // Video playback
-        if (m_videoLoaded && m_videoCap.isOpened() && t < m_duration)
+        if (!m_animationDone && t < m_duration)
         {
             float frameTime = t - m_lastFrameTime;
             if (frameTime >= m_frameInterval)
             {
-                if (m_videoCap.read(m_cvFrame) && !m_cvFrame.empty())
+                m_lastFrameTime = t;
+
+                cv::Mat candidates, neighbours, revealNow;
+
+                cv::bitwise_and(m_blackMask, ~m_currentMask, candidates);
+                neighbours = getNeighbourVisiblePixels(m_currentMask);
+                cv::bitwise_and(candidates, neighbours, revealNow);
+
+                if (cv::countNonZero(revealNow) == 0)
                 {
-                    m_lastFrameTime = t;
-                    cv::cvtColor(m_cvFrame, m_cvFrameRGBA, cv::COLOR_BGR2RGBA);
-
-                    if (m_cvFrameRGBA.empty())
-                        return;
-
-                    m_sfmlVideoTexture.update(m_cvFrameRGBA.data);
-                    m_tguiVideoTexture.loadFromPixelData(
-                        {static_cast<unsigned>(m_cvFrameRGBA.cols),
-                         static_cast<unsigned>(m_cvFrameRGBA.rows)},
-                        m_cvFrameRGBA.data);
-                    m_videoDisplay->getRenderer()->setTexture(m_tguiVideoTexture);
+                    m_animationDone = true; // animation done
                 }
                 else
                 {
-                    // End of video or error
-                    m_videoCap.set(cv::CAP_PROP_POS_FRAMES, 0);
+                    m_currentMask.setTo(255, revealNow);
+                    updateMaskTexture();
                 }
             }
         }
@@ -144,8 +111,6 @@ class WelcomeScreen
         if (t >= m_duration)
         {
             m_panel->setVisible(false);
-            if (m_videoCap.isOpened())
-                m_videoCap.release();
             if (m_panel->getParent())
                 m_gui.remove(m_panel);
         }
@@ -154,6 +119,42 @@ class WelcomeScreen
     [[nodiscard]] bool isActive() const
     {
         return m_panel && m_panel->isVisible();
+    }
+
+  private:
+    void updateMaskTexture()
+    {
+        // Create image: white background, black where revealed
+        cv::Mat frameGray(160, 160, CV_8U, cv::Scalar(255));
+        frameGray.setTo(0, m_currentMask);
+
+        cv::Mat rgba;
+        cv::cvtColor(frameGray, rgba, cv::COLOR_GRAY2RGBA);
+        m_sfmlVideoTexture.update(rgba.data);
+        m_tguiVideoTexture.loadFromPixelData({160, 160}, rgba.data);
+        m_videoDisplay->getRenderer()->setTexture(m_tguiVideoTexture);
+    }
+
+    cv::Mat getNeighbourVisiblePixels(const cv::Mat& mask)
+    {
+        cv::Mat up, down, left, right;
+        cv::Mat result = cv::Mat::zeros(mask.size(), CV_8U);
+
+        cv::copyMakeBorder(mask, up, 1, 0, 0, 0, cv::BORDER_CONSTANT, 0);
+        up = up.rowRange(0, mask.rows);
+        cv::copyMakeBorder(mask, down, 0, 1, 0, 0, cv::BORDER_CONSTANT, 0);
+        down = down.rowRange(1, mask.rows + 1);
+        cv::copyMakeBorder(mask, left, 0, 0, 1, 0, cv::BORDER_CONSTANT, 0);
+        left = left.colRange(0, mask.cols);
+        cv::copyMakeBorder(mask, right, 0, 0, 0, 1, cv::BORDER_CONSTANT, 0);
+        right = right.colRange(1, mask.cols + 1);
+
+        result |= up;
+        result |= down;
+        result |= left;
+        result |= right;
+
+        return result;
     }
 
   private:
@@ -166,14 +167,13 @@ class WelcomeScreen
     const float m_duration;
     const float m_fadeDuration;
 
-    // Video
-    cv::VideoCapture m_videoCap;
-    cv::Mat          m_cvFrame;
-    cv::Mat          m_cvFrameRGBA;
-    sf::Texture      m_sfmlVideoTexture;
-    tgui::Texture    m_tguiVideoTexture;
-
-    bool  m_videoLoaded;
-    float m_lastFrameTime;
-    float m_frameInterval;
+    // Animation
+    cv::Mat       m_blackMask;
+    cv::Mat       m_currentMask;
+    cv::Mat       m_cvFrameRGBA;
+    sf::Texture   m_sfmlVideoTexture;
+    tgui::Texture m_tguiVideoTexture;
+    bool          m_animationDone;
+    float         m_lastFrameTime;
+    float         m_frameInterval;
 };

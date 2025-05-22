@@ -13,6 +13,7 @@
 #include "modules/logs_report/logs_report.h"
 #include "modules/mesh/mesh.h"
 #include "modules/tile/hexagon_tile.h"
+#include "modules/ai_inference/ModelProcessor.h"
 
 #include "screens/welcome_screen.h"
 #include "screens/homepage_screen.h"
@@ -61,6 +62,20 @@ static const unsigned WINDOW_HEIGHT = 1000u;
 
 int main()
 {
+    // 0 - Model inference
+    const std::string model_path = "assets/model/traced_model.pt";
+    const std::string csv_output_path = "output.csv";
+    const std::string image_output_path = "output_plot.png";
+
+    ModelProcessor processor(model_path);
+
+    if (!processor.run()) {
+        std::cerr << "Failed to run model processing.\n";
+        return -1;
+    }
+
+    std::cout << "Processing complete.\n";
+
     // ── 1) Window & GUI ───────────────────────────────────────
     sf::RenderWindow window(
         sf::VideoMode(sf::Vector2u(WINDOW_WIDTH, WINDOW_HEIGHT)),

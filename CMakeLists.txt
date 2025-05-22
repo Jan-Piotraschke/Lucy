@@ -80,6 +80,12 @@ find_package(OpenCV CONFIG REQUIRED)
 find_package(kissfft CONFIG REQUIRED COMPONENTS float)
 
 # ------------------------------------------------------------------------------
+# 6) Add AI
+# ------------------------------------------------------------------------------
+set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libtorch")
+find_package(Torch REQUIRED)
+
+# ------------------------------------------------------------------------------
 # 7) Create the executable and link libraries
 # ------------------------------------------------------------------------------
 add_executable(main
@@ -92,6 +98,7 @@ add_executable(main
     src/modules/kamon_fourier/components/visualizer/visualizer.cpp
     src/modules/kamon_fourier/kamon_fourier.cpp
     src/modules/logs_report/logs_report.cpp
+    src/modules/ai_inference/ModelProcessor.cpp
 )
 
 target_compile_features(main PRIVATE cxx_std_20)
@@ -103,6 +110,7 @@ target_link_libraries(main
         ${OpenCV_LIBS}
         quirc::quirc
         kissfft::kissfft-float
+        "${TORCH_LIBRARIES}"
 )
 
 set_target_properties(main PROPERTIES

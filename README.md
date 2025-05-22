@@ -18,6 +18,7 @@
        libfreetype-dev
    ```
 2. MacOS instructions:
+   Please install ```libtorch```as a folder next to the src folder
 
    Be sure to run these commands in the root directory of this project.
 
@@ -48,6 +49,13 @@ Change the pixelated kamon version using this command from ImageMagick:
 
 ```bash
 magick assets/kamon.png -scale 160x160 -alpha off -depth 8 -colors 2 -scale 512x512 -filter point assets/kamon_pixelated.png
+magick kamon.svg -scale 160x160 -alpha off -depth 8 -colors 2 -scale 512x512 -filter point pixelated.png
+```
+
+### Animation of the kamon
+
+```bash
+python scripts/animation/kamon.py assets/kamon_fourier.png assets/welcome_animation.mp4 --fps 40
 ```
 
 ## Development

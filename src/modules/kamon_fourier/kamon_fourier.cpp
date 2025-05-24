@@ -26,7 +26,7 @@ namespace
 using complexf = std::complex<float>;
 
 constexpr float kSpeed         = 1.0f;
-constexpr int   kNumComponents = 48;  // bei "24" sieht man gerade noch das kamon
+constexpr int   kNumComponents = 48; // bei "24" sieht man gerade noch das kamon
 
 // ──────────────────────────────────────────────────────────────────────────────
 // RAII helper for kiss_fft_cfg
@@ -89,6 +89,48 @@ void normalize(std::vector<sf::Vector2f>& pts)
         for (auto& p : pts)
             p /= maxVal;
     }
+}
+
+// Shift the contour starting point to the opposite side
+void shiftContourToOpposite(std::vector<sf::Vector2f>& pts)
+{
+    if (pts.size() < 2)
+        return;
+
+    const int shift = pts.size() / 2; // halfway around
+    std::rotate(pts.begin(), pts.begin() + shift, pts.end());
+}
+
+void shiftContourToBottomMiddle(std::vector<sf::Vector2f>& pts)
+{
+    if (pts.empty())
+        return;
+
+    // Step 1: Compute average X
+    float avgX =
+        std::accumulate(
+            pts.begin(), pts.end(), 0.f, [](float sum, const sf::Vector2f& p) { return sum + p.x; })
+        / static_cast<float>(pts.size());
+
+    // Step 2 & 3: Find the point closest to avgX with the lowest Y
+    int   bestIdx  = 0;
+    float bestDist = std::numeric_limits<float>::max();
+
+    for (int i = 0; i < pts.size(); ++i)
+    {
+        float xDist = std::abs(pts[i].x - avgX);
+        float yVal  = pts[i].y;
+
+        float score = xDist + yVal * 0.01f; // prioritize X, break ties with Y
+        if (score < bestDist)
+        {
+            bestDist = score;
+            bestIdx  = i;
+        }
+    }
+
+    // Step 4: Rotate to that index
+    std::rotate(pts.begin(), pts.begin() + bestIdx, pts.end());
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -185,6 +227,8 @@ void initFourierData()
         return;
     }
 
+    shiftContourToBottomMiddle(g_state.contourPts);
+    shiftContourToOpposite(g_state.contourPts);
     normalize(g_state.contourPts);
     computeFourier(g_state.contourPts);
 

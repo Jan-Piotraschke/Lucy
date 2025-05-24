@@ -9,14 +9,14 @@
 #include <optional>
 #include <vector>
 
+#include "modules/ai_inference/ModelProcessor.h"
 #include "modules/kamon_fourier/kamon_fourier.h"
 #include "modules/logs_report/logs_report.h"
 #include "modules/mesh/mesh.h"
 #include "modules/tile/hexagon_tile.h"
-#include "modules/ai_inference/ModelProcessor.h"
 
-#include "screens/welcome_screen.h"
 #include "screens/homepage_screen.h"
+#include "screens/welcome_screen.h"
 
 enum class Screen
 {
@@ -63,13 +63,14 @@ static const unsigned WINDOW_HEIGHT = 1000u;
 int main()
 {
     // 0 - Model inference
-    const std::string model_path = "assets/model/traced_model.pt";
-    const std::string csv_output_path = "output.csv";
+    const std::string model_path        = "assets/model/traced_model.pt";
+    const std::string csv_output_path   = "output.csv";
     const std::string image_output_path = "output_plot.png";
 
     ModelProcessor processor(model_path);
 
-    if (!processor.run()) {
+    if (!processor.run())
+    {
         std::cerr << "Failed to run model processing.\n";
         return -1;
     }
@@ -113,27 +114,33 @@ int main()
     // Home screen (from new module)
     homeContainer = HomepageScreen::createHomepagePanel(
         window.getSize(),
-        /* onLogsClick  */ [&]()
+        /* onLogsClick  */
+        [&]()
         {
             loading = true;
             loadingClock.restart();
             std::cout << "[LOGS] Start loading...\n";
         },
-        /* onMeshClick  */ [&]()
+        /* onMeshClick  */
+        [&]()
         {
             currentScreen = Screen::Mesh;
-            hideAllScreens({homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
+            hideAllScreens(
+                {homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
             meshContainer->setVisible(true);
         },
-        /* onFourierClick */ [&]()
+        /* onFourierClick */
+        [&]()
         {
             currentScreen = Screen::KamonFourier;
-            hideAllScreens({homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
+            hideAllScreens(
+                {homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
             kamonFourierContainer->setVisible(true);
         },
         /* modeOnlineRef */ modeOnline,
         /* onMenuClick   */ [&]() { menuWindow->setVisible(true); },
-        /* onShutdownClick */ [&]()
+        /* onShutdownClick */
+        [&]()
         {
             showGoodbye = true;
             menuWindow->setVisible(false);
@@ -143,7 +150,11 @@ int main()
         [&]()
         {
             currentScreen = Screen::Home;
-            hideAllScreens({homeContainer, logAnalysisContainer, meshContainer, KamonFourier::getFourierPanel()});
+            hideAllScreens(
+                {homeContainer,
+                 logAnalysisContainer,
+                 meshContainer,
+                 KamonFourier::getFourierPanel()});
             homeContainer->setVisible(true);
         });
     logAnalysisContainer->getRenderer()->setBackgroundColor(RetroPalette::PanelBg);
@@ -154,7 +165,11 @@ int main()
         [&]()
         {
             currentScreen = Screen::Home;
-            hideAllScreens({homeContainer, logAnalysisContainer, meshContainer, KamonFourier::getFourierPanel()});
+            hideAllScreens(
+                {homeContainer,
+                 logAnalysisContainer,
+                 meshContainer,
+                 KamonFourier::getFourierPanel()});
             homeContainer->setVisible(true);
         });
     meshContainer->setSize({(float)WINDOW_WIDTH, (float)WINDOW_HEIGHT});
@@ -164,7 +179,8 @@ int main()
         [&]()
         {
             currentScreen = Screen::Home;
-            hideAllScreens({homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
+            hideAllScreens(
+                {homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
             homeContainer->setVisible(true);
         });
     kamonFourierContainer->setSize({(float)WINDOW_WIDTH, (float)WINDOW_HEIGHT});
@@ -207,8 +223,8 @@ int main()
     shutdownBtn->setPosition(10, 110);
     shutdownBtn->setSize(200, 30);
     shutdownBtn->getRenderer()->setBackgroundColor(RetroPalette::SpringGreen);
-    shutdownBtn->onPress([
-        &]()
+    shutdownBtn->onPress(
+        [&]()
         {
             showGoodbye = true;
             menuWindow->setVisible(false);
@@ -263,10 +279,10 @@ int main()
         if (!window.isOpen())
             break;
 
-        // Welcome screen logic
+        // Welcome screen logic only (no sparkle drawing here)
         if (!welcomeHandled)
         {
-            welcome.update();
+            welcome.update(window);
             if (!welcome.isActive())
             {
                 homeContainer->setVisible(true);
@@ -281,7 +297,8 @@ int main()
             {
                 loading       = false;
                 currentScreen = Screen::LogAnalysis;
-                hideAllScreens({homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
+                hideAllScreens(
+                    {homeContainer, logAnalysisContainer, meshContainer, kamonFourierContainer});
                 logAnalysisContainer->setVisible(true);
                 std::cout << "[LOGS] Done loading, switch to LogAnalysis screen.\n";
             }
@@ -292,7 +309,13 @@ int main()
         // Render
         window.clear(RetroPalette::LightGray);
         window.setView(window.getDefaultView());
-        gui.draw();
+
+        gui.draw(); // Draw GUI first (including panels)
+
+        if (!welcomeHandled && welcome.isActive() && welcome.shouldRenderSparkles())
+        {
+            welcome.renderSparkles();
+        }
 
         if (currentScreen == Screen::KamonFourier)
         {

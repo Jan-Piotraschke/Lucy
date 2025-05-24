@@ -1,16 +1,13 @@
 #pragma once
 
-#include <SFML/Graphics/Color.hpp>
-#include <SFML/Graphics/Texture.hpp>
-#include <SFML/System.hpp>
+#include <SFML/Graphics.hpp>
 #include <TGUI/AllWidgets.hpp>
-
+#include <cmath>
+#include <iostream>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
-
-#include <algorithm>
-#include <iostream>
 #include <string>
+#include <vector>
 
 class WelcomeScreen
 {
@@ -25,8 +22,10 @@ class WelcomeScreen
         , m_duration(5.0f)
         , m_fadeDuration(0.3f)
         , m_animationDone(false)
+        , m_sparkleStarted(false)
+        , m_sparkleDuration(1.5f)
         , m_lastFrameTime(0.f)
-        , m_frameInterval(1.0f / 60.f) // animation frame rate
+        , m_frameInterval(1.0f / 60.f)
     {
         m_panel = tgui::Panel::create(
             {static_cast<float>(windowSize.x), static_cast<float>(windowSize.y)});
@@ -34,11 +33,12 @@ class WelcomeScreen
         m_panel->getRenderer()->setOpacity(0.f);
         m_gui.add(m_panel);
 
+        // Central image (reveal)
         m_videoDisplay = tgui::Picture::create();
         m_videoDisplay->setPosition({"(&.width - width)/2", "20%"});
         m_panel->add(m_videoDisplay);
 
-        // Load input image
+        // Load and prepare image
         cv::Mat grayImage = cv::imread("assets/img/kamon_fourier.png", cv::IMREAD_GRAYSCALE);
         if (grayImage.empty())
         {
@@ -47,39 +47,68 @@ class WelcomeScreen
         }
 
         cv::resize(grayImage, grayImage, cv::Size(160, 160), 0, 0, cv::INTER_NEAREST);
-        m_blackMask = grayImage < 128;
-
+        m_blackMask    = grayImage < 128;
         m_currentMask  = cv::Mat::zeros(m_blackMask.size(), CV_8U);
         int revealRows = static_cast<int>(0.6 * m_blackMask.rows);
         m_blackMask.rowRange(0, revealRows).copyTo(m_currentMask.rowRange(0, revealRows));
 
         m_cvFrameRGBA.create(160, 160, CV_8UC4);
         updateMaskTexture();
-
         m_videoDisplay->setSize({240, 240});
 
+        // Label
         m_label = tgui::Label::create(message);
         m_label->setTextSize(48);
         m_label->getRenderer()->setTextColor(textColor);
         m_label->setPosition({"(&.width - width)/2", "60%"});
         m_panel->add(m_label);
 
+        // Load sparkle texture
+        if (!m_sparkleTexture.loadFromFile("assets/img/sparkle.png"))
+        {
+            std::cerr << "Failed to load sparkle image!\n";
+        }
+        else
+        {
+            const size_t sparkleCount = 6;           // Quarter-circle sparkles
+            const float  quarterArc   = M_PI / 2.0f; // 90 degrees
+
+            for (size_t i = 0; i < sparkleCount; ++i)
+            {
+                sf::Sprite sprite(m_sparkleTexture);
+                sprite.setOrigin(sf::Vector2f(m_sparkleTexture.getSize()) / 2.f);
+
+                // Store angle offset in sprite rotation (reused)
+                float angleOffset = static_cast<float>(i) / sparkleCount * quarterArc;
+                sprite.setRotation(sf::radians(angleOffset));
+
+                m_sparkles.emplace_back(sprite);
+            }
+        }
+
         m_panel->setVisible(true);
         m_clock.restart();
     }
 
-    void update()
+    bool shouldRenderSparkles() const
+    {
+        float t = m_clock.getElapsedTime().asSeconds();
+        return m_sparkleStarted && t >= m_duration - 1.8f && t < m_duration + m_sparkleDuration;
+    }
+
+    void update(sf::RenderTarget& target)
     {
         if (!m_panel || !m_panel->isVisible())
             return;
 
-        const float t = m_clock.getElapsedTime().asSeconds();
+        float t = m_clock.getElapsedTime().asSeconds();
 
         // Fade logic
         if (t < m_fadeDuration)
             m_panel->getRenderer()->setOpacity(t / m_fadeDuration);
-        else if (t > m_duration - m_fadeDuration)
-            m_panel->getRenderer()->setOpacity(std::max(0.f, (m_duration - t) / m_fadeDuration));
+        else if (t > m_duration + m_sparkleDuration - m_fadeDuration)
+            m_panel->getRenderer()->setOpacity(
+                std::max(0.f, (m_duration + m_sparkleDuration - t) / m_fadeDuration));
         else
             m_panel->getRenderer()->setOpacity(1.f);
 
@@ -91,14 +120,14 @@ class WelcomeScreen
                 m_lastFrameTime = t;
 
                 cv::Mat candidates, neighbours, revealNow;
-
                 cv::bitwise_and(m_blackMask, ~m_currentMask, candidates);
                 neighbours = getNeighbourVisiblePixels(m_currentMask);
                 cv::bitwise_and(candidates, neighbours, revealNow);
 
                 if (cv::countNonZero(revealNow) == 0)
                 {
-                    m_animationDone = true; // animation done
+                    m_animationDone = true;
+                    m_sparkleClock.restart();
                 }
                 else
                 {
@@ -108,7 +137,18 @@ class WelcomeScreen
             }
         }
 
-        if (t >= m_duration)
+        if (m_animationDone && !m_sparkleStarted)
+        {
+            m_sparkleStarted = true;
+            m_sparkleClock.restart();
+        }
+
+        if (m_sparkleStarted && t >= m_duration && t < m_duration + m_sparkleDuration)
+        {
+            renderSparkles();
+        }
+
+        if (t >= m_duration + m_sparkleDuration)
         {
             m_panel->setVisible(false);
             if (m_panel->getParent())
@@ -121,10 +161,34 @@ class WelcomeScreen
         return m_panel && m_panel->isVisible();
     }
 
+    void renderSparkles()
+    {
+        float time   = m_sparkleClock.getElapsedTime().asSeconds();
+        float radius = 140.0f;
+
+        sf::Vector2f videoPos  = m_videoDisplay->getAbsolutePosition();
+        sf::Vector2f videoSize = m_videoDisplay->getSize();
+        sf::Vector2f center    = videoPos + videoSize / 2.f;
+
+        auto* renderWindow = dynamic_cast<sf::RenderWindow*>(m_gui.getWindow());
+        if (!renderWindow)
+            return;
+
+        for (auto& sparkle : m_sparkles)
+        {
+            float angleOffset = sparkle.getRotation().asRadians();
+            float angle       = angleOffset + time * 3.0f;
+            float x           = center.x + radius * std::cos(angle);
+            float y           = center.y + radius * std::sin(angle);
+            sparkle.setPosition({x, y});
+            sparkle.setScale({0.8f, 0.8f});
+            renderWindow->draw(sparkle);
+        }
+    }
+
   private:
     void updateMaskTexture()
     {
-        // Create image: white background, black where revealed
         cv::Mat frameGray(160, 160, CV_8U, cv::Scalar(255));
         frameGray.setTo(0, m_currentMask);
 
@@ -166,14 +230,21 @@ class WelcomeScreen
     sf::Clock   m_clock;
     const float m_duration;
     const float m_fadeDuration;
+    float       m_lastFrameTime;
+    float       m_frameInterval;
+    bool        m_animationDone;
 
-    // Animation
+    // Sparkle animation
+    sf::Texture             m_sparkleTexture;
+    std::vector<sf::Sprite> m_sparkles;
+    bool                    m_sparkleStarted;
+    float                   m_sparkleDuration;
+    sf::Clock               m_sparkleClock;
+
+    // OpenCV
     cv::Mat       m_blackMask;
     cv::Mat       m_currentMask;
     cv::Mat       m_cvFrameRGBA;
     sf::Texture   m_sfmlVideoTexture;
     tgui::Texture m_tguiVideoTexture;
-    bool          m_animationDone;
-    float         m_lastFrameTime;
-    float         m_frameInterval;
 };
